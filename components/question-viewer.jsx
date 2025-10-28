@@ -6,6 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   ChevronLeft,
   ChevronRight,
   Shuffle,
@@ -37,12 +42,33 @@ export function QuestionViewer({
   const [markedForReview, setMarkedForReview] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [showTimer, setShowTimer] = useState(true);
-  const [showExplanation, setShowExplanation] = useState(false);
+  const [isChecked, setIsChecked] = useState(false);
+  const [wrongAttempts, setWrongAttempts] = useState([]);
+  const [isCorrectAnswer, setIsCorrectAnswer] = useState(false);
+  const [justChecked, setJustChecked] = useState(false);
+  const [lastCheckWasCorrect, setLastCheckWasCorrect] = useState(false);
 
   // Debug: Log the full question to console only once when question changes
   useEffect(() => {
     console.log("Full Question:", question);
   }, [question.questionId]);
+
+  // Reset answer states when question changes
+  useEffect(() => {
+    setSelectedChoice(null);
+    setIsChecked(false);
+    setWrongAttempts([]);
+    setIsCorrectAnswer(false);
+    setJustChecked(false);
+    setLastCheckWasCorrect(false);
+  }, [question.questionId]);
+
+  // Reset button feedback when user selects a new answer
+  useEffect(() => {
+    if (selectedChoice && justChecked && !lastCheckWasCorrect) {
+      setJustChecked(false);
+    }
+  }, [selectedChoice, justChecked, lastCheckWasCorrect]);
 
   // Use localStorage to persist navigation visibility across page navigations
   const [showNavigation, setShowNavigation] = useState(() => {
@@ -83,6 +109,48 @@ export function QuestionViewer({
       H: "Hard",
     };
     return difficultyMap[difficulty] || difficulty;
+  };
+
+  // Get correct answer(s) from question data
+  const getCorrectAnswers = () => {
+    if (!Array.isArray(question.detail) && question.detail.keys) {
+      // Format 1: Reading & Writing - keys array contains correct answer IDs
+      return question.detail.keys;
+    }
+    if (Array.isArray(question.detail) && question.detail[0]?.answer?.correct) {
+      // Format 2: Math - correct field contains the correct answer key
+      return [question.detail[0].answer.correct];
+    }
+    return [];
+  };
+
+  // Check if selected answer is correct
+  const isAnswerCorrect = () => {
+    const correctAnswers = getCorrectAnswers();
+    return correctAnswers.includes(selectedChoice);
+  };
+
+  // Handle check button click
+  const handleCheck = () => {
+    if (!selectedChoice) {
+      alert("Please select an answer first");
+      return;
+    }
+
+    const correct = isAnswerCorrect();
+    setJustChecked(true);
+    setLastCheckWasCorrect(correct);
+
+    if (correct) {
+      // Correct answer - lock the question
+      setIsCorrectAnswer(true);
+      setIsChecked(true);
+    } else {
+      // Wrong answer - add to wrong attempts and allow retry
+      setWrongAttempts((prev) => [...prev, selectedChoice]);
+      setSelectedChoice(null);
+      setIsChecked(false);
+    }
   };
 
   const buildQuestionUrl = (questionId) => {
@@ -355,52 +423,57 @@ export function QuestionViewer({
                   {question.detail.type === "mcq" &&
                     question.detail.answerOptions && (
                       <div className="space-y-3">
-                        {question.detail.answerOptions.map((choice, idx) => (
-                          <button
-                            key={choice.id}
-                            onClick={() => setSelectedChoice(choice.id)}
-                            className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
-                              selectedChoice === choice.id
-                                ? "border-blue-600 bg-blue-50"
-                                : "border-gray-300 hover:border-gray-400 bg-white"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div
-                                className={`flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center ${
-                                  selectedChoice === choice.id
-                                    ? "border-blue-600 bg-blue-600 text-white"
-                                    : "border-gray-400"
-                                }`}
-                              >
-                                {String.fromCharCode(65 + idx)}
+                        {question.detail.answerOptions.map((choice, idx) => {
+                          const isSelected = selectedChoice === choice.id;
+                          const correctAnswers = getCorrectAnswers();
+                          const isCorrect = correctAnswers.includes(choice.id);
+                          const isWrongAttempt = wrongAttempts.includes(choice.id);
+
+                          // Determine styling based on check state
+                          let buttonClass = "w-full text-left p-4 rounded-lg border-2 transition-all ";
+                          let badgeClass = "flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center ";
+
+                          if (isCorrectAnswer && isSelected && isCorrect) {
+                            // Correct answer locked
+                            buttonClass += "border-green-600 bg-green-50";
+                            badgeClass += "border-green-600 bg-green-600 text-white";
+                          } else if (isWrongAttempt) {
+                            // Previous wrong attempt - keep red
+                            buttonClass += "border-red-600 bg-red-50";
+                            badgeClass += "border-red-600 bg-red-600 text-white";
+                          } else if (isSelected) {
+                            // Current selection - show blue
+                            buttonClass += "border-blue-600 bg-blue-50";
+                            badgeClass += "border-blue-600 bg-blue-600 text-white";
+                          } else {
+                            // Not selected
+                            buttonClass += "border-gray-300 hover:border-gray-400 bg-white";
+                            badgeClass += "border-gray-400";
+                          }
+
+                          return (
+                            <button
+                              key={choice.id}
+                              onClick={() => !isCorrectAnswer && !isWrongAttempt && setSelectedChoice(choice.id)}
+                              disabled={isCorrectAnswer || isWrongAttempt}
+                              className={buttonClass}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={badgeClass}>
+                                  {String.fromCharCode(65 + idx)}
+                                </div>
+                                <div
+                                  className="flex-1"
+                                  dangerouslySetInnerHTML={{
+                                    __html: choice.content,
+                                  }}
+                                />
                               </div>
-                              <div
-                                className="flex-1"
-                                dangerouslySetInnerHTML={{
-                                  __html: choice.content,
-                                }}
-                              />
-                            </div>
-                          </button>
-                        ))}
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
-
-                  {/* Explanation for Reading & Writing */}
-                  {showExplanation && (
-                    <div className="mt-6 p-6 bg-blue-50 border border-blue-200 rounded-lg">
-                      <h3 className="font-semibold text-lg mb-3 text-blue-900">
-                        Explanation
-                      </h3>
-                      <div
-                        className="prose prose-sm max-w-none"
-                        dangerouslySetInnerHTML={{
-                          __html: question.detail.rationale,
-                        }}
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
             ) : (
@@ -426,35 +499,55 @@ export function QuestionViewer({
                   ) {
                     return (
                       <div className="space-y-3">
-                        {question.detail.answerOptions.map((choice, idx) => (
-                          <button
-                            key={choice.id}
-                            onClick={() => setSelectedChoice(choice.id)}
-                            className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
-                              selectedChoice === choice.id
-                                ? "border-blue-600 bg-blue-50"
-                                : "border-gray-300 hover:border-gray-400 bg-white"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div
-                                className={`flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center ${
-                                  selectedChoice === choice.id
-                                    ? "border-blue-600 bg-blue-600 text-white"
-                                    : "border-gray-400"
-                                }`}
-                              >
-                                {String.fromCharCode(65 + idx)}
+                        {question.detail.answerOptions.map((choice, idx) => {
+                          const isSelected = selectedChoice === choice.id;
+                          const correctAnswers = getCorrectAnswers();
+                          const isCorrect = correctAnswers.includes(choice.id);
+                          const isWrongAttempt = wrongAttempts.includes(choice.id);
+
+                          // Determine styling based on check state
+                          let buttonClass = "w-full text-left p-4 rounded-lg border-2 transition-all ";
+                          let badgeClass = "flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center ";
+
+                          if (isCorrectAnswer && isSelected && isCorrect) {
+                            // Correct answer locked
+                            buttonClass += "border-green-600 bg-green-50";
+                            badgeClass += "border-green-600 bg-green-600 text-white";
+                          } else if (isWrongAttempt) {
+                            // Previous wrong attempt - keep red
+                            buttonClass += "border-red-600 bg-red-50";
+                            badgeClass += "border-red-600 bg-red-600 text-white";
+                          } else if (isSelected) {
+                            // Current selection - show blue
+                            buttonClass += "border-blue-600 bg-blue-50";
+                            badgeClass += "border-blue-600 bg-blue-600 text-white";
+                          } else {
+                            // Not selected
+                            buttonClass += "border-gray-300 hover:border-gray-400 bg-white";
+                            badgeClass += "border-gray-400";
+                          }
+
+                          return (
+                            <button
+                              key={choice.id}
+                              onClick={() => !isCorrectAnswer && !isWrongAttempt && setSelectedChoice(choice.id)}
+                              disabled={isCorrectAnswer || isWrongAttempt}
+                              className={buttonClass}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={badgeClass}>
+                                  {String.fromCharCode(65 + idx)}
+                                </div>
+                                <div
+                                  className="flex-1"
+                                  dangerouslySetInnerHTML={{
+                                    __html: choice.content,
+                                  }}
+                                />
                               </div>
-                              <div
-                                className="flex-1"
-                                dangerouslySetInnerHTML={{
-                                  __html: choice.content,
-                                }}
-                              />
-                            </div>
-                          </button>
-                        ))}
+                            </button>
+                          );
+                        })}
                       </div>
                     );
                   }
@@ -472,24 +565,42 @@ export function QuestionViewer({
                         {choiceKeys.map((key, idx) => {
                           if (!choices[key]) return null;
 
+                          const isSelected = selectedChoice === key;
+                          const correctAnswers = getCorrectAnswers();
+                          const isCorrect = correctAnswers.includes(key);
+                          const isWrongAttempt = wrongAttempts.includes(key);
+
+                          // Determine styling based on check state
+                          let buttonClass = "w-full text-left p-4 rounded-lg border-2 transition-all ";
+                          let badgeClass = "flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center ";
+
+                          if (isCorrectAnswer && isSelected && isCorrect) {
+                            // Correct answer locked
+                            buttonClass += "border-green-600 bg-green-50";
+                            badgeClass += "border-green-600 bg-green-600 text-white";
+                          } else if (isWrongAttempt) {
+                            // Previous wrong attempt - keep red
+                            buttonClass += "border-red-600 bg-red-50";
+                            badgeClass += "border-red-600 bg-red-600 text-white";
+                          } else if (isSelected) {
+                            // Current selection - show blue
+                            buttonClass += "border-blue-600 bg-blue-50";
+                            badgeClass += "border-blue-600 bg-blue-600 text-white";
+                          } else {
+                            // Not selected
+                            buttonClass += "border-gray-300 hover:border-gray-400 bg-white";
+                            badgeClass += "border-gray-400";
+                          }
+
                           return (
                             <button
                               key={key}
-                              onClick={() => setSelectedChoice(key)}
-                              className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
-                                selectedChoice === key
-                                  ? "border-blue-600 bg-blue-50"
-                                  : "border-gray-300 hover:border-gray-400 bg-white"
-                              }`}
+                              onClick={() => !isCorrectAnswer && !isWrongAttempt && setSelectedChoice(key)}
+                              disabled={isCorrectAnswer || isWrongAttempt}
+                              className={buttonClass}
                             >
                               <div className="flex items-center gap-3">
-                                <div
-                                  className={`flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center ${
-                                    selectedChoice === key
-                                      ? "border-blue-600 bg-blue-600 text-white"
-                                      : "border-gray-400"
-                                  }`}
-                                >
+                                <div className={badgeClass}>
                                   {key.toUpperCase()}
                                 </div>
                                 <div
@@ -524,23 +635,6 @@ export function QuestionViewer({
 
                   return null;
                 })()}
-
-                {/* Explanation Section for Math */}
-                {showExplanation && (
-                  <div className="mt-6 p-6 bg-blue-50 border border-blue-200 rounded-lg">
-                    <h3 className="font-semibold text-lg mb-3 text-blue-900">
-                      Explanation
-                    </h3>
-                    <div
-                      className="prose prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{
-                        __html: Array.isArray(question.detail)
-                          ? question.detail[0]?.answer?.rationale
-                          : question.detail.rationale,
-                      }}
-                    />
-                  </div>
-                )}
               </div>
             )}
           </Card>
@@ -550,12 +644,28 @@ export function QuestionViewer({
       {/* Fixed Bottom Action Buttons */}
       <div className="bg-white border-t px-6 py-4 fixed bottom-0 left-0 right-0 z-50">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <Button
-            variant="outline"
-            onClick={() => setShowExplanation(!showExplanation)}
-          >
-            {showExplanation ? "Hide Explanation" : "Show Explanation"}
-          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline">Show Explanation</Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[600px] max-h-[500px] overflow-y-auto" side="top" align="start">
+              <div className="space-y-3">
+                <h3 className="font-semibold text-lg text-blue-900">
+                  Explanation
+                </h3>
+                <div
+                  className="prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{
+                    __html: !Array.isArray(question.detail) && question.detail.stimulus
+                      ? question.detail.rationale
+                      : Array.isArray(question.detail)
+                      ? question.detail[0]?.answer?.rationale
+                      : question.detail.rationale,
+                  }}
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
 
           <div className="text-sm font-semibold text-gray-700">
             Question {currentIndex} of {totalQuestions}
@@ -576,12 +686,21 @@ export function QuestionViewer({
             </Button>
             <Button
               variant="outline"
-              onClick={() => {
-                // Check answer logic here
-                alert("Check answer functionality");
-              }}
+              onClick={handleCheck}
+              disabled={!selectedChoice || isCorrectAnswer}
+              className={
+                justChecked
+                  ? lastCheckWasCorrect
+                    ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
+                    : "bg-red-600 text-white border-red-600 hover:bg-red-700"
+                  : ""
+              }
             >
-              Check
+              {justChecked
+                ? lastCheckWasCorrect
+                  ? "✓ Correct"
+                  : "✗ Incorrect"
+                : "Check"}
             </Button>
           </div>
         </div>
