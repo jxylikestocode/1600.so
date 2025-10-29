@@ -38,6 +38,7 @@ export function QuestionViewer({
 }) {
   const router = useRouter();
   const [selectedChoice, setSelectedChoice] = useState(null);
+  const [textAnswer, setTextAnswer] = useState(""); // For SPR (text input) questions
   const [jumpToInput, setJumpToInput] = useState("");
   const [markedForReview, setMarkedForReview] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -56,6 +57,7 @@ export function QuestionViewer({
   // Reset answer states when question changes
   useEffect(() => {
     setSelectedChoice(null);
+    setTextAnswer("");
     setIsChecked(false);
     setWrongAttempts([]);
     setIsCorrectAnswer(false);
@@ -63,12 +65,19 @@ export function QuestionViewer({
     setLastCheckWasCorrect(false);
   }, [question.questionId]);
 
-  // Reset button feedback when user selects a new answer
+  // Reset button feedback when user selects a new answer (MCQ)
   useEffect(() => {
     if (selectedChoice && justChecked && !lastCheckWasCorrect) {
       setJustChecked(false);
     }
   }, [selectedChoice, justChecked, lastCheckWasCorrect]);
+
+  // Reset button feedback when user types a new answer (SPR)
+  useEffect(() => {
+    if (textAnswer && justChecked && !lastCheckWasCorrect) {
+      setJustChecked(false);
+    }
+  }, [textAnswer, justChecked, lastCheckWasCorrect]);
 
   // Use localStorage to persist navigation visibility across page navigations
   const [showNavigation, setShowNavigation] = useState(() => {
@@ -127,12 +136,34 @@ export function QuestionViewer({
   // Check if selected answer is correct
   const isAnswerCorrect = () => {
     const correctAnswers = getCorrectAnswers();
+
+    // For SPR questions (text input)
+    if (!Array.isArray(question.detail) && question.detail.type === "spr") {
+      // Normalize both user answer and correct answers for comparison
+      const normalizedUserAnswer = textAnswer.trim();
+
+      // Check if user's answer matches any of the correct answers
+      return correctAnswers.some(correctAnswer => {
+        const normalizedCorrectAnswer = String(correctAnswer).trim();
+        return normalizedUserAnswer === normalizedCorrectAnswer;
+      });
+    }
+
+    // For MCQ questions
     return correctAnswers.includes(selectedChoice);
   };
 
   // Handle check button click
   const handleCheck = () => {
-    if (!selectedChoice) {
+    // Determine if this is an SPR question
+    const isSPR = !Array.isArray(question.detail) && question.detail.type === "spr";
+
+    // Validate that user has provided an answer
+    if (isSPR && !textAnswer.trim()) {
+      alert("Please enter an answer first");
+      return;
+    }
+    if (!isSPR && !selectedChoice) {
       alert("Please select an answer first");
       return;
     }
@@ -146,9 +177,15 @@ export function QuestionViewer({
       setIsCorrectAnswer(true);
       setIsChecked(true);
     } else {
-      // Wrong answer - add to wrong attempts and allow retry
-      setWrongAttempts((prev) => [...prev, selectedChoice]);
-      setSelectedChoice(null);
+      // Wrong answer - allow retry
+      if (isSPR) {
+        // For SPR, just clear the input (don't track wrong attempts for text)
+        setTextAnswer("");
+      } else {
+        // For MCQ, add to wrong attempts and clear selection
+        setWrongAttempts((prev) => [...prev, selectedChoice]);
+        setSelectedChoice(null);
+      }
       setIsChecked(false);
     }
   };
@@ -294,7 +331,7 @@ export function QuestionViewer({
             <div className="flex items-center gap-2">
               <span className="font-semibold">Question Bank ID</span>
               <span className="font-bold text-blue-600">
-                Q {question.questionId}
+                {question.questionId}
               </span>
             </div>
 
@@ -427,34 +464,46 @@ export function QuestionViewer({
                           const isSelected = selectedChoice === choice.id;
                           const correctAnswers = getCorrectAnswers();
                           const isCorrect = correctAnswers.includes(choice.id);
-                          const isWrongAttempt = wrongAttempts.includes(choice.id);
+                          const isWrongAttempt = wrongAttempts.includes(
+                            choice.id
+                          );
 
                           // Determine styling based on check state
-                          let buttonClass = "w-full text-left p-4 rounded-lg border-2 transition-all ";
-                          let badgeClass = "flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center ";
+                          let buttonClass =
+                            "w-full text-left p-4 rounded-lg border-2 transition-all ";
+                          let badgeClass =
+                            "flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center ";
 
                           if (isCorrectAnswer && isSelected && isCorrect) {
                             // Correct answer locked
                             buttonClass += "border-green-600 bg-green-50";
-                            badgeClass += "border-green-600 bg-green-600 text-white";
+                            badgeClass +=
+                              "border-green-600 bg-green-600 text-white";
                           } else if (isWrongAttempt) {
                             // Previous wrong attempt - keep red
                             buttonClass += "border-red-600 bg-red-50";
-                            badgeClass += "border-red-600 bg-red-600 text-white";
+                            badgeClass +=
+                              "border-red-600 bg-red-600 text-white";
                           } else if (isSelected) {
                             // Current selection - show blue
                             buttonClass += "border-blue-600 bg-blue-50";
-                            badgeClass += "border-blue-600 bg-blue-600 text-white";
+                            badgeClass +=
+                              "border-blue-600 bg-blue-600 text-white";
                           } else {
                             // Not selected
-                            buttonClass += "border-gray-300 hover:border-gray-400 bg-white";
+                            buttonClass +=
+                              "border-gray-300 hover:border-gray-400 bg-white";
                             badgeClass += "border-gray-400";
                           }
 
                           return (
                             <button
                               key={choice.id}
-                              onClick={() => !isCorrectAnswer && !isWrongAttempt && setSelectedChoice(choice.id)}
+                              onClick={() =>
+                                !isCorrectAnswer &&
+                                !isWrongAttempt &&
+                                setSelectedChoice(choice.id)
+                              }
                               disabled={isCorrectAnswer || isWrongAttempt}
                               className={buttonClass}
                             >
@@ -503,34 +552,46 @@ export function QuestionViewer({
                           const isSelected = selectedChoice === choice.id;
                           const correctAnswers = getCorrectAnswers();
                           const isCorrect = correctAnswers.includes(choice.id);
-                          const isWrongAttempt = wrongAttempts.includes(choice.id);
+                          const isWrongAttempt = wrongAttempts.includes(
+                            choice.id
+                          );
 
                           // Determine styling based on check state
-                          let buttonClass = "w-full text-left p-4 rounded-lg border-2 transition-all ";
-                          let badgeClass = "flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center ";
+                          let buttonClass =
+                            "w-full text-left p-4 rounded-lg border-2 transition-all ";
+                          let badgeClass =
+                            "flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center ";
 
                           if (isCorrectAnswer && isSelected && isCorrect) {
                             // Correct answer locked
                             buttonClass += "border-green-600 bg-green-50";
-                            badgeClass += "border-green-600 bg-green-600 text-white";
+                            badgeClass +=
+                              "border-green-600 bg-green-600 text-white";
                           } else if (isWrongAttempt) {
                             // Previous wrong attempt - keep red
                             buttonClass += "border-red-600 bg-red-50";
-                            badgeClass += "border-red-600 bg-red-600 text-white";
+                            badgeClass +=
+                              "border-red-600 bg-red-600 text-white";
                           } else if (isSelected) {
                             // Current selection - show blue
                             buttonClass += "border-blue-600 bg-blue-50";
-                            badgeClass += "border-blue-600 bg-blue-600 text-white";
+                            badgeClass +=
+                              "border-blue-600 bg-blue-600 text-white";
                           } else {
                             // Not selected
-                            buttonClass += "border-gray-300 hover:border-gray-400 bg-white";
+                            buttonClass +=
+                              "border-gray-300 hover:border-gray-400 bg-white";
                             badgeClass += "border-gray-400";
                           }
 
                           return (
                             <button
                               key={choice.id}
-                              onClick={() => !isCorrectAnswer && !isWrongAttempt && setSelectedChoice(choice.id)}
+                              onClick={() =>
+                                !isCorrectAnswer &&
+                                !isWrongAttempt &&
+                                setSelectedChoice(choice.id)
+                              }
                               disabled={isCorrectAnswer || isWrongAttempt}
                               className={buttonClass}
                             >
@@ -571,31 +632,41 @@ export function QuestionViewer({
                           const isWrongAttempt = wrongAttempts.includes(key);
 
                           // Determine styling based on check state
-                          let buttonClass = "w-full text-left p-4 rounded-lg border-2 transition-all ";
-                          let badgeClass = "flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center ";
+                          let buttonClass =
+                            "w-full text-left p-4 rounded-lg border-2 transition-all ";
+                          let badgeClass =
+                            "flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center ";
 
                           if (isCorrectAnswer && isSelected && isCorrect) {
                             // Correct answer locked
                             buttonClass += "border-green-600 bg-green-50";
-                            badgeClass += "border-green-600 bg-green-600 text-white";
+                            badgeClass +=
+                              "border-green-600 bg-green-600 text-white";
                           } else if (isWrongAttempt) {
                             // Previous wrong attempt - keep red
                             buttonClass += "border-red-600 bg-red-50";
-                            badgeClass += "border-red-600 bg-red-600 text-white";
+                            badgeClass +=
+                              "border-red-600 bg-red-600 text-white";
                           } else if (isSelected) {
                             // Current selection - show blue
                             buttonClass += "border-blue-600 bg-blue-50";
-                            badgeClass += "border-blue-600 bg-blue-600 text-white";
+                            badgeClass +=
+                              "border-blue-600 bg-blue-600 text-white";
                           } else {
                             // Not selected
-                            buttonClass += "border-gray-300 hover:border-gray-400 bg-white";
+                            buttonClass +=
+                              "border-gray-300 hover:border-gray-400 bg-white";
                             badgeClass += "border-gray-400";
                           }
 
                           return (
                             <button
                               key={key}
-                              onClick={() => !isCorrectAnswer && !isWrongAttempt && setSelectedChoice(key)}
+                              onClick={() =>
+                                !isCorrectAnswer &&
+                                !isWrongAttempt &&
+                                setSelectedChoice(key)
+                              }
                               disabled={isCorrectAnswer || isWrongAttempt}
                               className={buttonClass}
                             >
@@ -622,12 +693,29 @@ export function QuestionViewer({
                     !Array.isArray(question.detail) &&
                     question.detail.type === "spr"
                   ) {
+                    // Determine input styling based on check state
+                    let inputClass = "w-full p-4 border-2 rounded-lg focus:outline-none text-lg transition-all ";
+
+                    if (isCorrectAnswer) {
+                      // Correct answer - show green
+                      inputClass += "border-green-600 bg-green-50 focus:border-green-600";
+                    } else if (justChecked && !lastCheckWasCorrect) {
+                      // Just checked and wrong - show red briefly
+                      inputClass += "border-red-600 bg-red-50 focus:border-red-600";
+                    } else {
+                      // Default state
+                      inputClass += "border-gray-300 bg-white focus:border-blue-600";
+                    }
+
                     return (
                       <div className="mt-6">
                         <input
                           type="text"
+                          value={textAnswer}
+                          onChange={(e) => setTextAnswer(e.target.value)}
                           placeholder="Enter your answer"
-                          className="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none text-lg"
+                          disabled={isCorrectAnswer}
+                          className={inputClass}
                         />
                       </div>
                     );
@@ -648,7 +736,11 @@ export function QuestionViewer({
             <PopoverTrigger asChild>
               <Button variant="outline">Show Explanation</Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[600px] max-h-[500px] overflow-y-auto" side="top" align="start">
+            <PopoverContent
+              className="w-[600px] max-h-[500px] overflow-y-auto"
+              side="top"
+              align="start"
+            >
               <div className="space-y-3">
                 <h3 className="font-semibold text-lg text-blue-900">
                   Explanation
@@ -656,11 +748,13 @@ export function QuestionViewer({
                 <div
                   className="prose prose-sm max-w-none"
                   dangerouslySetInnerHTML={{
-                    __html: !Array.isArray(question.detail) && question.detail.stimulus
-                      ? question.detail.rationale
-                      : Array.isArray(question.detail)
-                      ? question.detail[0]?.answer?.rationale
-                      : question.detail.rationale,
+                    __html:
+                      !Array.isArray(question.detail) &&
+                      question.detail.stimulus
+                        ? question.detail.rationale
+                        : Array.isArray(question.detail)
+                        ? question.detail[0]?.answer?.rationale
+                        : question.detail.rationale,
                   }}
                 />
               </div>
@@ -687,7 +781,10 @@ export function QuestionViewer({
             <Button
               variant="outline"
               onClick={handleCheck}
-              disabled={!selectedChoice || isCorrectAnswer}
+              disabled={
+                isCorrectAnswer ||
+                (!selectedChoice && !textAnswer.trim())
+              }
               className={
                 justChecked
                   ? lastCheckWasCorrect
