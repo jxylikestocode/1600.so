@@ -18,7 +18,9 @@ import {
   Eye,
   Clock,
   Bookmark,
+  Calculator,
 } from "lucide-react";
+import { DesmosCalculator } from "@/components/desmos-calculator";
 
 /**
  * QuestionViewer Component
@@ -48,6 +50,7 @@ export function QuestionViewer({
   const [isCorrectAnswer, setIsCorrectAnswer] = useState(false);
   const [justChecked, setJustChecked] = useState(false);
   const [lastCheckWasCorrect, setLastCheckWasCorrect] = useState(false);
+  const [showCalculator, setShowCalculator] = useState(false);
 
   // Debug: Log the full question to console only once when question changes
   useEffect(() => {
@@ -407,8 +410,24 @@ export function QuestionViewer({
                 </button>
               </div>
 
-              {/* Right Side: Eye Icon and Timer */}
+              {/* Right Side: Calculator, Eye Icon and Timer */}
               <div className="flex items-center gap-4">
+                {/* Calculator button - only show for Math questions */}
+                {subject === "math" && (
+                  <button
+                    onClick={() => setShowCalculator(!showCalculator)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded transition-colors ${
+                      showCalculator
+                        ? "bg-blue-100 text-blue-800"
+                        : "hover:bg-gray-100 text-gray-700"
+                    }`}
+                    title={showCalculator ? "Hide calculator" : "Show calculator"}
+                  >
+                    <Calculator className="w-4 h-4" />
+                    <span className="text-sm font-medium">Calculator</span>
+                  </button>
+                )}
+
                 <button
                   onClick={() => setShowTimer(!showTimer)}
                   className="p-1 hover:bg-gray-200 rounded transition-colors"
@@ -885,6 +904,12 @@ export function QuestionViewer({
           </div>
         </div>
       )}
+
+      {/* Desmos Calculator Panel */}
+      <DesmosCalculator
+        isOpen={showCalculator}
+        onClose={() => setShowCalculator(false)}
+      />
     </div>
   );
 }
