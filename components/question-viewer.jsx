@@ -278,12 +278,13 @@ export function QuestionViewer({
       <div className="bg-white border-b px-6 py-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between">
-            <div>
-              <Button variant="ghost" size="sm" onClick={handleBackToHome}>
-                <ChevronLeft className="w-4 h-4 mr-1" />
-                Back to Question Bank
-              </Button>
-            </div>
+            {/* Logo */}
+            <button
+              onClick={handleBackToHome}
+              className="text-2xl font-bold text-gray-900 hover:text-gray-700 transition-colors"
+            >
+              1600.so
+            </button>
 
             {/* Timer, Calculator, Reference, More - Top Right */}
             <div className="flex items-center gap-4">
@@ -371,7 +372,11 @@ export function QuestionViewer({
 
       {/* Question Content */}
       <div className="flex-1 py-8 px-4">
-        <div className="max-w-7xl mx-auto">
+        <div
+          className={`mx-auto ${
+            subject === "math" ? "max-w-4xl" : "max-w-7xl"
+          }`}
+        >
           <Card className="p-0">
             {/* Question Header Bar */}
             <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
@@ -1011,7 +1016,7 @@ export function QuestionViewer({
                 </div>
 
                 {/* Legend */}
-                <div className="flex items-center justify-center gap-8 text-sm border-b pb-4">
+                <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm border-b pb-4">
                   <div className="flex items-center gap-2">
                     <MapPin className="w-5 h-5" />
                     <span className="font-medium">Current</span>
@@ -1021,8 +1026,20 @@ export function QuestionViewer({
                     <span className="font-medium">Unanswered</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Bookmark className="w-5 h-5 fill-red-600 text-red-600" />
-                    <span className="font-medium">For Review</span>
+                    <div className="w-6 h-6 rounded bg-green-500"></div>
+                    <span className="font-medium">Correct</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-red-500"></div>
+                    <span className="font-medium">Incorrect</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-red-500 border-2 border-green-500"></div>
+                    <span className="font-medium">Correct (with prior incorrect)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Bookmark className="w-5 h-5 fill-yellow-500 text-yellow-500" />
+                    <span className="font-medium">Marked for Review</span>
                   </div>
                 </div>
 
