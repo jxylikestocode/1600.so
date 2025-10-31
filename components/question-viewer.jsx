@@ -22,6 +22,7 @@ import {
   FileText,
   X,
   ChevronDown,
+  ChevronUp,
   MapPin,
 } from "lucide-react";
 import { DesmosCalculator } from "@/components/desmos-calculator";
@@ -367,59 +368,6 @@ export function QuestionViewer({
           </div>
         </div>
       </div> */}
-
-      {/* Current Question Info Bar */}
-      <div className="bg-white border-b px-6 py-3">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center gap-6 text-xs text-gray-700">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">Question Bank ID</span>
-              <span className="font-bold text-blue-600">
-                {question.questionId}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">Section</span>
-              <span className="font-bold text-gray-900">
-                {subject === "math"
-                  ? "Math"
-                  : subject === "reading-writing"
-                  ? "Reading & Writing"
-                  : "N/A"}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">Difficulty</span>
-              <span className="font-bold text-gray-900">
-                {formatDifficulty(question.difficulty)}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">Score Band</span>
-              <span className="font-bold text-gray-900">
-                {question.score_band_range_cd}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">Domain</span>
-              <span className="font-bold text-gray-900">
-                {question.primary_class_cd_desc}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">Skill</span>
-              <span className="font-bold text-gray-900">
-                {question.skill_desc}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Question Content */}
       <div className="flex-1 py-8 px-4">
@@ -874,7 +822,9 @@ export function QuestionViewer({
                                       }}
                                       className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white hover:bg-gray-50 border border-gray-400 text-sm font-semibold flex items-center justify-center"
                                     >
-                                      <span className="line-through">{key.toUpperCase()}</span>
+                                      <span className="line-through">
+                                        {key.toUpperCase()}
+                                      </span>
                                     </button>
                                   )}
                                 </>
@@ -987,7 +937,11 @@ export function QuestionViewer({
             <PopoverTrigger asChild>
               <button className="px-4 py-2 bg-gray-900 text-white rounded text-sm font-semibold hover:bg-gray-800 transition-colors flex items-center gap-2">
                 Question {currentIndex} of {totalQuestions}
-                <ChevronDown className="w-4 h-4" />
+                {showNavigation ? (
+                  <ChevronDown className="w-4 h-4" />
+                ) : (
+                  <ChevronUp className="w-4 h-4" />
+                )}
               </button>
             </PopoverTrigger>
             <PopoverContent
@@ -998,15 +952,62 @@ export function QuestionViewer({
               <div className="space-y-4">
                 {/* Header */}
                 <div className="flex items-center justify-between pb-3 border-b">
-                  <h2 className="text-xl font-semibold">
-                    Section 1: {subject === "math" ? "Math" : subject === "reading-writing" ? "Reading and Writing" : "Unknown"} Questions
-                  </h2>
+                  {/* <h2 className="text-xl font-semibold">
+                    Section 1:{" "}
+                    {subject === "math"
+                      ? "Math"
+                      : subject === "reading-writing"
+                      ? "Reading and Writing"
+                      : "Unknown"}{" "}
+                    Questions
+                  </h2> */}
                   <button
                     onClick={() => setShowNavigation(false)}
                     className="p-1 hover:bg-gray-100 rounded transition-colors"
                   >
                     <X className="w-6 h-6" />
                   </button>
+                </div>
+                {/* Question Metadata */}
+                <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-gray-700 border-b pb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">Section</span>
+                    <span className="font-bold text-gray-900">
+                      {subject === "math"
+                        ? "Math"
+                        : subject === "reading-writing"
+                        ? "Reading & Writing"
+                        : "N/A"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">Difficulty</span>
+                    <span className="font-bold text-gray-900">
+                      {formatDifficulty(question.difficulty)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">Score Band</span>
+                    <span className="font-bold text-gray-900">
+                      {question.score_band_range_cd}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">Domain</span>
+                    <span className="font-bold text-gray-900">
+                      {question.primary_class_cd_desc}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">Skill</span>
+                    <span className="font-bold text-gray-900">
+                      {question.skill_desc}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Legend */}
