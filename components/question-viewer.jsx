@@ -19,8 +19,13 @@ import {
   Clock,
   Bookmark,
   Calculator,
+  FileText,
+  X,
+  ChevronDown,
+  MapPin,
 } from "lucide-react";
 import { DesmosCalculator } from "@/components/desmos-calculator";
+import { ReferenceSheet } from "@/components/reference-sheet";
 
 /**
  * QuestionViewer Component
@@ -51,6 +56,10 @@ export function QuestionViewer({
   const [justChecked, setJustChecked] = useState(false);
   const [lastCheckWasCorrect, setLastCheckWasCorrect] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
+  const [showReference, setShowReference] = useState(false);
+  const [eliminationMode, setEliminationMode] = useState(false);
+  const [eliminatedChoices, setEliminatedChoices] = useState([]);
+  const [eliminationHistory, setEliminationHistory] = useState([]);
 
   // Debug: Log the full question to console only once when question changes
   useEffect(() => {
@@ -66,6 +75,9 @@ export function QuestionViewer({
     setIsCorrectAnswer(false);
     setJustChecked(false);
     setLastCheckWasCorrect(false);
+    setEliminatedChoices([]);
+    setEliminationHistory([]);
+    setEliminationMode(false);
   }, [question.questionId]);
 
   // Reset button feedback when user selects a new answer (MCQ)
@@ -82,21 +94,7 @@ export function QuestionViewer({
     }
   }, [textAnswer, justChecked, lastCheckWasCorrect]);
 
-  // Use localStorage to persist navigation visibility across page navigations
-  const [showNavigation, setShowNavigation] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("showNavigation");
-      return saved !== null ? JSON.parse(saved) : true;
-    }
-    return true;
-  });
-
-  // Save navigation visibility to localStorage whenever it changes
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("showNavigation", JSON.stringify(showNavigation));
-    }
-  }, [showNavigation]);
+  const [showNavigation, setShowNavigation] = useState(false);
 
   // Timer effect
   useEffect(() => {
@@ -146,7 +144,7 @@ export function QuestionViewer({
       const normalizedUserAnswer = textAnswer.trim();
 
       // Check if user's answer matches any of the correct answers
-      return correctAnswers.some(correctAnswer => {
+      return correctAnswers.some((correctAnswer) => {
         const normalizedCorrectAnswer = String(correctAnswer).trim();
         return normalizedUserAnswer === normalizedCorrectAnswer;
       });
@@ -159,7 +157,8 @@ export function QuestionViewer({
   // Handle check button click
   const handleCheck = () => {
     // Determine if this is an SPR question
-    const isSPR = !Array.isArray(question.detail) && question.detail.type === "spr";
+    const isSPR =
+      !Array.isArray(question.detail) && question.detail.type === "spr";
 
     // Validate that user has provided an answer
     if (isSPR && !textAnswer.trim()) {
@@ -244,32 +243,74 @@ export function QuestionViewer({
     }
   };
 
+  // Toggle answer elimination for a choice
+  const toggleElimination = (choiceId) => {
+    setEliminatedChoices((prev) => {
+      const isEliminated = prev.includes(choiceId);
+      const newEliminated = isEliminated
+        ? prev.filter((id) => id !== choiceId)
+        : [...prev, choiceId];
+
+      // Track history for undo
+      if (!isEliminated) {
+        setEliminationHistory((history) => [...history, choiceId]);
+      }
+
+      return newEliminated;
+    });
+  };
+
+  // Undo last elimination
+  const undoLastElimination = () => {
+    if (eliminationHistory.length > 0) {
+      const lastEliminated = eliminationHistory[eliminationHistory.length - 1];
+      setEliminatedChoices((prev) =>
+        prev.filter((id) => id !== lastEliminated)
+      );
+      setEliminationHistory((prev) => prev.slice(0, -1));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col pb-20">
       {/* Top Header Bar */}
       <div className="bg-white border-b px-6 py-4">
         <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between">
             <div>
               <Button variant="ghost" size="sm" onClick={handleBackToHome}>
                 <ChevronLeft className="w-4 h-4 mr-1" />
                 Back to Question Bank
               </Button>
             </div>
-          </div>
 
-          {/* Question Metadata */}
-          {/* <div className="flex flex-wrap gap-2 text-xs">
-            <Badge variant="outline" className="font-mono">
-              ID: {question.questionId}
-            </Badge>
-            <Badge variant="outline">{question.primary_class_cd_desc}</Badge>
-            <Badge variant="outline">{question.skill_desc}</Badge>
-            <Badge variant="outline">Difficulty: {question.difficulty}</Badge>
-            <Badge variant="outline">
-              Score Band: {question.score_band_range_cd}
-            </Badge>
-          </div> */}
+            {/* Timer, Calculator, Reference, More - Top Right */}
+            <div className="flex items-center gap-4">
+              {/* Calculator button - only show for Math questions */}
+              {subject === "math" && (
+                <button
+                  onClick={() => setShowCalculator(!showCalculator)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded transition-colors hover:bg-gray-100 text-gray-700"
+                  title={showCalculator ? "Hide calculator" : "Show calculator"}
+                >
+                  <Calculator className="w-4 h-4" />
+                  <span className="text-sm font-medium">Calculator</span>
+                </button>
+              )}
+
+              {/* Reference button - only show for Math questions */}
+              {subject === "math" && (
+                <button
+                  onClick={() => setShowReference(!showReference)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded transition-colors hover:bg-gray-100 text-gray-700"
+                  title={showReference ? "Hide reference" : "Show reference"}
+                >
+                  <FileText className="w-4 h-4" />
+                  <span className="text-sm font-medium">Reference</span>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -410,43 +451,34 @@ export function QuestionViewer({
                 </button>
               </div>
 
-              {/* Right Side: Calculator, Eye Icon and Timer */}
-              <div className="flex items-center gap-4">
-                {/* Calculator button - only show for Math questions */}
-                {subject === "math" && (
-                  <button
-                    onClick={() => setShowCalculator(!showCalculator)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded transition-colors ${
-                      showCalculator
-                        ? "bg-blue-100 text-blue-800"
-                        : "hover:bg-gray-100 text-gray-700"
-                    }`}
-                    title={showCalculator ? "Hide calculator" : "Show calculator"}
-                  >
-                    <Calculator className="w-4 h-4" />
-                    <span className="text-sm font-medium">Calculator</span>
-                  </button>
-                )}
+              {/* Center: Timer */}
+              {showTimer && (
+                <div className="flex items-center gap-2 text-gray-700">
+                  <Clock className="w-5 h-5" />
+                  <span className="font-mono text-lg font-semibold">
+                    {formatTime(elapsedTime)}
+                  </span>
+                </div>
+              )}
 
+              {/* Right Side: ABC */}
+              <div className="flex items-center gap-4">
+                {/* ABC Elimination button */}
                 <button
-                  onClick={() => setShowTimer(!showTimer)}
-                  className="p-1 hover:bg-gray-200 rounded transition-colors"
-                  title={showTimer ? "Hide timer" : "Show timer"}
+                  onClick={() => setEliminationMode(!eliminationMode)}
+                  className={`px-3 py-1.5 rounded transition-colors font-semibold ${
+                    eliminationMode
+                      ? "bg-blue-600 text-white"
+                      : "bg-blue-100 text-blue-800 hover:bg-blue-200"
+                  }`}
+                  title={
+                    eliminationMode
+                      ? "Exit elimination mode"
+                      : "Enable answer elimination"
+                  }
                 >
-                  {showTimer ? (
-                    <Eye className="w-5 h-5 text-gray-600" />
-                  ) : (
-                    <EyeOff className="w-5 h-5 text-gray-400" />
-                  )}
+                  <span className="text-sm line-through">ABC</span>
                 </button>
-                {showTimer && (
-                  <div className="flex items-center gap-2 text-gray-700">
-                    <Clock className="w-5 h-5" />
-                    <span className="font-mono text-lg font-semibold">
-                      {formatTime(elapsedTime)}
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -486,6 +518,9 @@ export function QuestionViewer({
                           const isWrongAttempt = wrongAttempts.includes(
                             choice.id
                           );
+                          const isEliminated = eliminatedChoices.includes(
+                            choice.id
+                          );
 
                           // Determine styling based on check state
                           let buttonClass =
@@ -516,28 +551,82 @@ export function QuestionViewer({
                           }
 
                           return (
-                            <button
-                              key={choice.id}
-                              onClick={() =>
-                                !isCorrectAnswer &&
-                                !isWrongAttempt &&
-                                setSelectedChoice(choice.id)
-                              }
-                              disabled={isCorrectAnswer || isWrongAttempt}
-                              className={buttonClass}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className={badgeClass}>
-                                  {String.fromCharCode(65 + idx)}
+                            <div key={choice.id} className="relative">
+                              <button
+                                onClick={() =>
+                                  !isCorrectAnswer &&
+                                  !isWrongAttempt &&
+                                  setSelectedChoice(choice.id)
+                                }
+                                disabled={isCorrectAnswer || isWrongAttempt}
+                                className={buttonClass}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className={badgeClass}>
+                                    {String.fromCharCode(65 + idx)}
+                                  </div>
+                                  <div
+                                    className={`flex-1 ${
+                                      isEliminated ? "opacity-50" : ""
+                                    }`}
+                                    dangerouslySetInnerHTML={{
+                                      __html: choice.content,
+                                    }}
+                                  />
                                 </div>
-                                <div
-                                  className="flex-1"
-                                  dangerouslySetInnerHTML={{
-                                    __html: choice.content,
-                                  }}
-                                />
-                              </div>
-                            </button>
+                              </button>
+
+                              {/* Elimination/Undo button */}
+                              {eliminationMode && (
+                                <>
+                                  {isEliminated ? (
+                                    // Show Undo button for all eliminated choices
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleElimination(choice.id);
+                                      }}
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-medium underline"
+                                    >
+                                      Undo
+                                    </button>
+                                  ) : (
+                                    // Show crossout button for non-eliminated choices
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleElimination(choice.id);
+                                      }}
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white hover:bg-gray-50 border border-gray-400 text-sm font-semibold flex items-center justify-center"
+                                    >
+                                      <span className="line-through">
+                                        {String.fromCharCode(65 + idx)}
+                                      </span>
+                                    </button>
+                                  )}
+                                </>
+                              )}
+
+                              {/* Strike-through overlay */}
+                              {isEliminated && (
+                                <div className="absolute left-0 right-20 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
+                                  <svg
+                                    className="w-full h-0.5"
+                                    preserveAspectRatio="none"
+                                    viewBox="0 0 100 1"
+                                  >
+                                    <line
+                                      x1="0"
+                                      y1="0.5"
+                                      x2="100"
+                                      y2="0.5"
+                                      stroke="red"
+                                      strokeWidth="2"
+                                    />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
                           );
                         })}
                       </div>
@@ -574,6 +663,9 @@ export function QuestionViewer({
                           const isWrongAttempt = wrongAttempts.includes(
                             choice.id
                           );
+                          const isEliminated = eliminatedChoices.includes(
+                            choice.id
+                          );
 
                           // Determine styling based on check state
                           let buttonClass =
@@ -604,28 +696,82 @@ export function QuestionViewer({
                           }
 
                           return (
-                            <button
-                              key={choice.id}
-                              onClick={() =>
-                                !isCorrectAnswer &&
-                                !isWrongAttempt &&
-                                setSelectedChoice(choice.id)
-                              }
-                              disabled={isCorrectAnswer || isWrongAttempt}
-                              className={buttonClass}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className={badgeClass}>
-                                  {String.fromCharCode(65 + idx)}
+                            <div key={choice.id} className="relative">
+                              <button
+                                onClick={() =>
+                                  !isCorrectAnswer &&
+                                  !isWrongAttempt &&
+                                  setSelectedChoice(choice.id)
+                                }
+                                disabled={isCorrectAnswer || isWrongAttempt}
+                                className={buttonClass}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className={badgeClass}>
+                                    {String.fromCharCode(65 + idx)}
+                                  </div>
+                                  <div
+                                    className={`flex-1 ${
+                                      isEliminated ? "opacity-50" : ""
+                                    }`}
+                                    dangerouslySetInnerHTML={{
+                                      __html: choice.content,
+                                    }}
+                                  />
                                 </div>
-                                <div
-                                  className="flex-1"
-                                  dangerouslySetInnerHTML={{
-                                    __html: choice.content,
-                                  }}
-                                />
-                              </div>
-                            </button>
+                              </button>
+
+                              {/* Elimination/Undo button */}
+                              {eliminationMode && (
+                                <>
+                                  {isEliminated ? (
+                                    // Show Undo button for all eliminated choices
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleElimination(choice.id);
+                                      }}
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-medium underline"
+                                    >
+                                      Undo
+                                    </button>
+                                  ) : (
+                                    // Show crossout button for non-eliminated choices
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleElimination(choice.id);
+                                      }}
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white hover:bg-gray-50 border border-gray-400 text-sm font-semibold flex items-center justify-center"
+                                    >
+                                      <span className="line-through">
+                                        {String.fromCharCode(65 + idx)}
+                                      </span>
+                                    </button>
+                                  )}
+                                </>
+                              )}
+
+                              {/* Strike-through overlay */}
+                              {isEliminated && (
+                                <div className="absolute left-0 right-20 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
+                                  <svg
+                                    className="w-full h-0.5"
+                                    preserveAspectRatio="none"
+                                    viewBox="0 0 100 1"
+                                  >
+                                    <line
+                                      x1="0"
+                                      y1="0.5"
+                                      x2="100"
+                                      y2="0.5"
+                                      stroke="red"
+                                      strokeWidth="2"
+                                    />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
                           );
                         })}
                       </div>
@@ -649,6 +795,7 @@ export function QuestionViewer({
                           const correctAnswers = getCorrectAnswers();
                           const isCorrect = correctAnswers.includes(key);
                           const isWrongAttempt = wrongAttempts.includes(key);
+                          const isEliminated = eliminatedChoices.includes(key);
 
                           // Determine styling based on check state
                           let buttonClass =
@@ -679,28 +826,80 @@ export function QuestionViewer({
                           }
 
                           return (
-                            <button
-                              key={key}
-                              onClick={() =>
-                                !isCorrectAnswer &&
-                                !isWrongAttempt &&
-                                setSelectedChoice(key)
-                              }
-                              disabled={isCorrectAnswer || isWrongAttempt}
-                              className={buttonClass}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className={badgeClass}>
-                                  {key.toUpperCase()}
+                            <div key={key} className="relative">
+                              <button
+                                onClick={() =>
+                                  !isCorrectAnswer &&
+                                  !isWrongAttempt &&
+                                  setSelectedChoice(key)
+                                }
+                                disabled={isCorrectAnswer || isWrongAttempt}
+                                className={buttonClass}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className={badgeClass}>
+                                    {key.toUpperCase()}
+                                  </div>
+                                  <div
+                                    className={`flex-1 ${
+                                      isEliminated ? "opacity-50" : ""
+                                    }`}
+                                    dangerouslySetInnerHTML={{
+                                      __html: choices[key].body,
+                                    }}
+                                  />
                                 </div>
-                                <div
-                                  className="flex-1"
-                                  dangerouslySetInnerHTML={{
-                                    __html: choices[key].body,
-                                  }}
-                                />
-                              </div>
-                            </button>
+                              </button>
+
+                              {/* Elimination/Undo button */}
+                              {eliminationMode && (
+                                <>
+                                  {isEliminated ? (
+                                    // Show Undo button for all eliminated choices
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleElimination(key);
+                                      }}
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-medium underline"
+                                    >
+                                      Undo
+                                    </button>
+                                  ) : (
+                                    // Show crossout button for non-eliminated choices
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleElimination(key);
+                                      }}
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white hover:bg-gray-50 border border-gray-400 text-sm font-semibold flex items-center justify-center"
+                                    >
+                                      <span className="line-through">{key.toUpperCase()}</span>
+                                    </button>
+                                  )}
+                                </>
+                              )}
+
+                              {/* Strike-through overlay */}
+                              {isEliminated && (
+                                <div className="absolute left-0 right-20 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
+                                  <svg
+                                    className="w-full h-0.5"
+                                    preserveAspectRatio="none"
+                                    viewBox="0 0 100 1"
+                                  >
+                                    <line
+                                      x1="0"
+                                      y1="0.5"
+                                      x2="100"
+                                      y2="0.5"
+                                      stroke="red"
+                                      strokeWidth="2"
+                                    />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
                           );
                         })}
                       </div>
@@ -713,17 +912,21 @@ export function QuestionViewer({
                     question.detail.type === "spr"
                   ) {
                     // Determine input styling based on check state
-                    let inputClass = "w-full p-4 border-2 rounded-lg focus:outline-none text-lg transition-all ";
+                    let inputClass =
+                      "w-full p-4 border-2 rounded-lg focus:outline-none text-lg transition-all ";
 
                     if (isCorrectAnswer) {
                       // Correct answer - show green
-                      inputClass += "border-green-600 bg-green-50 focus:border-green-600";
+                      inputClass +=
+                        "border-green-600 bg-green-50 focus:border-green-600";
                     } else if (justChecked && !lastCheckWasCorrect) {
                       // Just checked and wrong - show red briefly
-                      inputClass += "border-red-600 bg-red-50 focus:border-red-600";
+                      inputClass +=
+                        "border-red-600 bg-red-50 focus:border-red-600";
                     } else {
                       // Default state
-                      inputClass += "border-gray-300 bg-white focus:border-blue-600";
+                      inputClass +=
+                        "border-gray-300 bg-white focus:border-blue-600";
                     }
 
                     return (
@@ -780,9 +983,83 @@ export function QuestionViewer({
             </PopoverContent>
           </Popover>
 
-          <div className="text-sm font-semibold text-gray-700">
-            Question {currentIndex} of {totalQuestions}
-          </div>
+          <Popover open={showNavigation} onOpenChange={setShowNavigation}>
+            <PopoverTrigger asChild>
+              <button className="px-4 py-2 bg-gray-900 text-white rounded text-sm font-semibold hover:bg-gray-800 transition-colors flex items-center gap-2">
+                Question {currentIndex} of {totalQuestions}
+                <ChevronDown className="w-4 h-4" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-[800px] max-h-[600px] overflow-y-auto"
+              side="top"
+              align="center"
+            >
+              <div className="space-y-4">
+                {/* Header */}
+                <div className="flex items-center justify-between pb-3 border-b">
+                  <h2 className="text-xl font-semibold">
+                    Section 1: {subject === "math" ? "Math" : subject === "reading-writing" ? "Reading and Writing" : "Unknown"} Questions
+                  </h2>
+                  <button
+                    onClick={() => setShowNavigation(false)}
+                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                {/* Legend */}
+                <div className="flex items-center justify-center gap-8 text-sm border-b pb-4">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-5 h-5" />
+                    <span className="font-medium">Current</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded border-2 border-dashed border-gray-400"></div>
+                    <span className="font-medium">Unanswered</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Bookmark className="w-5 h-5 fill-red-600 text-red-600" />
+                    <span className="font-medium">For Review</span>
+                  </div>
+                </div>
+
+                {/* Question Grid */}
+                <div className="flex flex-wrap gap-3 justify-center">
+                  {allFilteredQuestions.map((q, idx) => {
+                    const questionNum = idx + 1;
+                    const isCurrent = questionNum === currentIndex;
+
+                    return (
+                      <button
+                        key={q.questionId}
+                        onClick={() => {
+                          router.push(buildQuestionUrl(q.questionId));
+                          setShowNavigation(false);
+                        }}
+                        className={`relative w-14 h-14 rounded border-2 border-dashed border-gray-400 font-semibold text-lg transition-all hover:bg-gray-50 ${
+                          isCurrent ? "bg-white" : "bg-white"
+                        }`}
+                      >
+                        {isCurrent && (
+                          <MapPin className="w-4 h-4 absolute -top-2 left-1/2 -translate-x-1/2" />
+                        )}
+                        <span className="text-blue-600">{questionNum}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Go to Review Page Button */}
+                <div className="flex justify-center pt-2">
+                  <button className="px-6 py-2 border-2 border-blue-600 text-blue-600 rounded-full font-semibold hover:bg-blue-50 transition-colors">
+                    Go to Review Page
+                  </button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
 
           <div className="flex gap-3">
             <Button
@@ -801,8 +1078,7 @@ export function QuestionViewer({
               variant="outline"
               onClick={handleCheck}
               disabled={
-                isCorrectAnswer ||
-                (!selectedChoice && !textAnswer.trim())
+                isCorrectAnswer || (!selectedChoice && !textAnswer.trim())
               }
               className={
                 justChecked
@@ -822,93 +1098,16 @@ export function QuestionViewer({
         </div>
       </div>
 
-      {/* Bottom Navigation Panel */}
-      {showNavigation && (
-        <div className="bg-white border-t px-6 py-4">
-          <div className="max-w-6xl mx-auto">
-            {/* Top Controls */}
-            <div className="flex items-center gap-3 mb-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowNavigation(false)}
-                className="text-blue-600 border-blue-600 hover:bg-blue-50"
-              >
-                <EyeOff className="w-4 h-4 mr-2" />
-                Hide Navigation
-              </Button>
-              <Button variant="outline" size="sm" className="border-gray-300">
-                <Shuffle className="w-4 h-4 mr-2" />
-                Shuffle Question Order
-              </Button>
-            </div>
-
-            {/* Glossary */}
-            <div className="flex items-center gap-6 mb-4 text-sm">
-              <span className="font-semibold">Glossary:</span>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span>Correct</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                <span>Incorrect</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-gradient-to-r from-green-500 to-red-500"></div>
-                <span>Correct (with prior incorrect attempt)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                <span>Marked for Review</span>
-              </div>
-            </div>
-
-            {/* Question Grid */}
-            <div className="flex flex-wrap gap-2">
-              {allFilteredQuestions.map((q, idx) => {
-                const questionNum = idx + 1;
-                const isCurrent = questionNum === currentIndex;
-
-                return (
-                  <button
-                    key={q.questionId}
-                    onClick={() => router.push(buildQuestionUrl(q.questionId))}
-                    className={`w-12 h-12 rounded-lg border-2 font-semibold text-sm transition-all ${
-                      isCurrent
-                        ? "bg-gray-900 text-white border-gray-900"
-                        : "bg-white text-gray-900 border-gray-900 hover:bg-gray-100"
-                    }`}
-                  >
-                    {questionNum}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Show Navigation Button (when hidden) */}
-      {!showNavigation && (
-        <div className="bg-white border-t px-6 py-2">
-          <div className="max-w-6xl mx-auto">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowNavigation(true)}
-              className="text-blue-600 border-blue-600 hover:bg-blue-50"
-            >
-              Show Navigation
-            </Button>
-          </div>
-        </div>
-      )}
-
       {/* Desmos Calculator Panel */}
       <DesmosCalculator
         isOpen={showCalculator}
         onClose={() => setShowCalculator(false)}
+      />
+
+      {/* Reference Sheet Panel */}
+      <ReferenceSheet
+        isOpen={showReference}
+        onClose={() => setShowReference(false)}
       />
     </div>
   );
