@@ -591,7 +591,7 @@ export function QuestionViewer({
               <div className="p-8">
                 {/* Question Stem (Text) */}
                 <div
-                  className="mb-6 prose prose-sm max-w-none"
+                  className="mb-6 text-base leading-relaxed text-gray-900 [&_*]:!inline [&_img]:align-middle"
                   dangerouslySetInnerHTML={{
                     __html: Array.isArray(question.detail)
                       ? question.detail[0]?.prompt
@@ -923,7 +923,7 @@ export function QuestionViewer({
                   Explanation
                 </h3>
                 <div
-                  className="prose prose-sm max-w-none"
+                  className="text-base leading-relaxed text-gray-900 [&_*]:!inline [&_img]:align-middle"
                   dangerouslySetInnerHTML={{
                     __html:
                       !Array.isArray(question.detail) &&
@@ -940,7 +940,7 @@ export function QuestionViewer({
 
           <Popover open={showNavigation} onOpenChange={setShowNavigation}>
             <PopoverTrigger asChild>
-              <button className="px-4 py-2 bg-gray-900 text-white rounded text-sm font-semibold hover:bg-gray-800 transition-colors flex items-center gap-2">
+              <button className="px-4 py-2 mx-3 bg-gray-900 text-white rounded text-sm font-semibold hover:bg-gray-800 transition-colors flex items-center gap-2">
                 Question {currentIndex} of {totalQuestions}
                 {showNavigation ? (
                   <ChevronDown className="w-4 h-4" />
