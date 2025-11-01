@@ -5,6 +5,9 @@ import { QuestionCountSummary } from "@/components/question-count-summary";
 import Link from "next/link";
 import { BarChart3, BookMarked } from "lucide-react";
 
+// Force dynamic rendering to avoid ISR page size limit
+export const dynamic = 'force-dynamic';
+
 /**
  * Home Page - Test Page
  *

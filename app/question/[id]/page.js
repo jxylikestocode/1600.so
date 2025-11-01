@@ -2,6 +2,9 @@ import { getAllQuestions, getQuestionById } from "@/lib/data";
 import { QuestionViewer } from "@/components/question-viewer";
 import { notFound } from "next/navigation";
 
+// Force dynamic rendering to avoid ISR page size limit
+export const dynamic = 'force-dynamic';
+
 /**
  * Question Page
  *
