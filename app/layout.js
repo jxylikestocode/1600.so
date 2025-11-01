@@ -1,6 +1,8 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import "katex/dist/katex.min.css";
+import { UserDataProvider } from "@/contexts/user-data-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,7 +31,7 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <UserDataProvider>{children}</UserDataProvider>
       </body>
     </html>
   );

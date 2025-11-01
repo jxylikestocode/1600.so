@@ -15,6 +15,7 @@ export default async function QuestionPage({ params, searchParams }) {
   const skill = resolvedSearchParams.skill;
   const subject = resolvedSearchParams.subject;
   const bandsParam = resolvedSearchParams.bands;
+  const fromReview = resolvedSearchParams.from === 'review';
 
   // Parse selected bands from URL
   const selectedBands = bandsParam
@@ -70,6 +71,7 @@ export default async function QuestionPage({ params, searchParams }) {
       subject={subject}
       selectedBands={selectedBands}
       allFilteredQuestions={filteredQuestions}
+      isReviewMode={fromReview}
     />
   );
 }

@@ -119,4 +119,71 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Table styles for question previews */
+  table {
+    @apply border-collapse border border-gray-300 my-2;
+  }
+
+  td, th {
+    @apply border border-gray-300 px-3 py-2 text-center;
+  }
+
+  th {
+    @apply bg-gray-50 font-semibold;
+  }
+}
+
+/* Question preview specific styles - OUTSIDE @layer to get higher priority */
+/* CRITICAL: Override Tailwind's .table utility class that's being applied to figure.table */
+/* This prevents figure.table from getting display: table from Tailwind */
+.question-preview figure[class*="table"],
+.question-preview figure.table,
+.question-preview figure.table figure.table,
+.question-preview figure.table figure.table figure.table,
+.question-preview figure.table figure.table figure.table figure.table {
+  display: block !important;
+  margin: 8px 0 !important;
+}
+
+/* Actual table element should display as table */
+div.question-preview table {
+  display: table !important;
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+  border: 1px solid #d1d5db !important;
+  margin: 8px 0 !important;
+  width: auto !important;
+}
+
+div.question-preview table thead {
+  display: table-header-group !important;
+}
+
+div.question-preview table tbody {
+  display: table-row-group !important;
+}
+
+div.question-preview table tr,
+div.question-preview table tbody tr,
+div.question-preview table thead tr {
+  display: table-row !important;
+  border: none !important;
+}
+
+div.question-preview table td,
+div.question-preview table th,
+div.question-preview table tbody td,
+div.question-preview table tbody th {
+  display: table-cell !important;
+  border: 1px solid #d1d5db !important;
+  padding: 8px 12px !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+div.question-preview table th,
+div.question-preview table tbody th {
+  background-color: #f9fafb !important;
+  font-weight: 600 !important;
 }

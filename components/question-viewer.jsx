@@ -24,9 +24,12 @@ import {
   ChevronDown,
   ChevronUp,
   MapPin,
+  ArrowLeft,
 } from "lucide-react";
 import { DesmosCalculator } from "@/components/desmos-calculator";
 import { ReferenceSheet } from "@/components/reference-sheet";
+import { useUserData } from "@/contexts/user-data-context";
+import { trackAnswer, trackFeature, trackNavigation } from "@/lib/analytics";
 
 /**
  * QuestionViewer Component
@@ -43,8 +46,11 @@ export function QuestionViewer({
   subject,
   selectedBands,
   allFilteredQuestions,
+  isReviewMode = false,
 }) {
   const router = useRouter();
+  const userData = useUserData();
+
   const [selectedChoice, setSelectedChoice] = useState(null);
   const [textAnswer, setTextAnswer] = useState(""); // For SPR (text input) questions
   const [jumpToInput, setJumpToInput] = useState("");
@@ -61,13 +67,14 @@ export function QuestionViewer({
   const [eliminationMode, setEliminationMode] = useState(false);
   const [eliminatedChoices, setEliminatedChoices] = useState([]);
   const [eliminationHistory, setEliminationHistory] = useState([]);
+  const [questionHistory, setQuestionHistory] = useState(null);
 
   // Debug: Log the full question to console only once when question changes
   useEffect(() => {
     console.log("Full Question:", question);
   }, [question.questionId]);
 
-  // Reset answer states when question changes
+  // Reset answer states and load history when question changes
   useEffect(() => {
     setSelectedChoice(null);
     setTextAnswer("");
@@ -76,10 +83,27 @@ export function QuestionViewer({
     setIsCorrectAnswer(false);
     setJustChecked(false);
     setLastCheckWasCorrect(false);
-    setEliminatedChoices([]);
-    setEliminationHistory([]);
     setEliminationMode(false);
-  }, [question.questionId]);
+
+    // Load question history from localStorage
+    const history = userData.getQuestionHistory(question.questionId);
+    setQuestionHistory(history);
+
+    // If user already got this question correct, lock it
+    if (history && history.lastCorrect) {
+      setIsCorrectAnswer(true);
+      setIsChecked(true);
+    }
+
+    // Load bookmarked status
+    const isBookmarked = userData.isBookmarked(question.questionId);
+    setMarkedForReview(isBookmarked);
+
+    // Load eliminated choices
+    const savedEliminations = userData.getEliminatedChoices(question.questionId);
+    setEliminatedChoices(savedEliminations);
+    setEliminationHistory([]);
+  }, [question.questionId, userData]);
 
   // Reset button feedback when user selects a new answer (MCQ)
   useEffect(() => {
@@ -175,6 +199,31 @@ export function QuestionViewer({
     setJustChecked(true);
     setLastCheckWasCorrect(correct);
 
+    // Save answer to localStorage
+    const answerValue = isSPR ? textAnswer : selectedChoice;
+    userData.saveAnswer(
+      question.questionId,
+      answerValue,
+      correct,
+      elapsedTime,
+      {
+        skill: question.skill_desc,
+        subject: question.subject || 'reading-writing',
+        difficulty: question.difficulty,
+        scoreBand: question.score_band_range_cd,
+      }
+    );
+
+    // Track answer attempt in analytics
+    trackAnswer(
+      question.questionId,
+      question.skill_desc,
+      question.subject || 'reading-writing',
+      question.difficulty,
+      correct,
+      elapsedTime
+    );
+
     if (correct) {
       // Correct answer - lock the question
       setIsCorrectAnswer(true);
@@ -257,6 +306,9 @@ export function QuestionViewer({
         setEliminationHistory((history) => [...history, choiceId]);
       }
 
+      // Save to localStorage
+      userData.saveEliminatedChoices(question.questionId, newEliminated);
+
       return newEliminated;
     });
   };
@@ -265,9 +317,12 @@ export function QuestionViewer({
   const undoLastElimination = () => {
     if (eliminationHistory.length > 0) {
       const lastEliminated = eliminationHistory[eliminationHistory.length - 1];
-      setEliminatedChoices((prev) =>
-        prev.filter((id) => id !== lastEliminated)
-      );
+      setEliminatedChoices((prev) => {
+        const newEliminated = prev.filter((id) => id !== lastEliminated);
+        // Save to localStorage
+        userData.saveEliminatedChoices(question.questionId, newEliminated);
+        return newEliminated;
+      });
       setEliminationHistory((prev) => prev.slice(0, -1));
     }
   };
@@ -278,20 +333,34 @@ export function QuestionViewer({
       <div className="bg-white border-b px-6 py-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between">
-            {/* Logo */}
-            <button
-              onClick={handleBackToHome}
-              className="text-2xl font-bold text-gray-900 hover:text-gray-700 transition-colors"
-            >
-              1600.so
-            </button>
+            {/* Logo or Back to Review */}
+            {isReviewMode ? (
+              <button
+                onClick={() => router.push('/review')}
+                className="flex items-center gap-2 text-gray-900 hover:text-gray-700 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                <span className="text-lg font-semibold">Back to Review</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleBackToHome}
+                className="text-2xl font-bold text-gray-900 hover:text-gray-700 transition-colors"
+              >
+                1600.so
+              </button>
+            )}
 
             {/* Timer, Calculator, Reference, More - Top Right */}
             <div className="flex items-center gap-4">
               {/* Calculator button - only show for Math questions */}
               {subject === "math" && (
                 <button
-                  onClick={() => setShowCalculator(!showCalculator)}
+                  onClick={() => {
+                    const newValue = !showCalculator;
+                    setShowCalculator(newValue);
+                    trackFeature('calculator', newValue ? 'open' : 'close');
+                  }}
                   className="flex items-center gap-2 px-3 py-1.5 rounded transition-colors hover:bg-gray-100 text-gray-700"
                   title={showCalculator ? "Hide calculator" : "Show calculator"}
                 >
@@ -303,7 +372,11 @@ export function QuestionViewer({
               {/* Reference button - only show for Math questions */}
               {subject === "math" && (
                 <button
-                  onClick={() => setShowReference(!showReference)}
+                  onClick={() => {
+                    const newValue = !showReference;
+                    setShowReference(newValue);
+                    trackFeature('reference', newValue ? 'open' : 'close');
+                  }}
                   className="flex items-center gap-2 px-3 py-1.5 rounded transition-colors hover:bg-gray-100 text-gray-700"
                   title={showReference ? "Hide reference" : "Show reference"}
                 >
@@ -386,9 +459,25 @@ export function QuestionViewer({
                   {currentIndex}
                 </Badge>
 
+                {/* Previous Attempt Indicator */}
+                {questionHistory && (
+                  <Badge
+                    className={`px-3 py-1.5 text-sm font-medium ${
+                      questionHistory.lastCorrect
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {questionHistory.lastCorrect ? "✓ Correct" : "✗ Attempted"}
+                  </Badge>
+                )}
+
                 {/* Mark for Review */}
                 <button
-                  onClick={() => setMarkedForReview(!markedForReview)}
+                  onClick={() => {
+                    const newValue = userData.toggleBookmark(question.questionId);
+                    setMarkedForReview(newValue);
+                  }}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded transition-colors ${
                     markedForReview
                       ? "bg-yellow-100 text-yellow-800"
@@ -404,8 +493,8 @@ export function QuestionViewer({
                 </button>
               </div>
 
-              {/* Center: Timer */}
-              {showTimer && (
+              {/* Center: Timer (hidden in review mode) */}
+              {showTimer && !isReviewMode && (
                 <div className="flex items-center gap-2 text-gray-700">
                   <Clock className="w-5 h-5" />
                   <span className="font-mono text-lg font-semibold">
@@ -418,7 +507,11 @@ export function QuestionViewer({
               <div className="flex items-center gap-4">
                 {/* ABC Elimination button */}
                 <button
-                  onClick={() => setEliminationMode(!eliminationMode)}
+                  onClick={() => {
+                    const newValue = !eliminationMode;
+                    setEliminationMode(newValue);
+                    trackFeature('elimination', newValue ? 'enable' : 'disable');
+                  }}
                   className={`px-3 py-1.5 rounded transition-colors font-semibold ${
                     eliminationMode
                       ? "bg-blue-600 text-white"
@@ -1035,7 +1128,9 @@ export function QuestionViewer({
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded bg-red-500 border-2 border-green-500"></div>
-                    <span className="font-medium">Correct (with prior incorrect)</span>
+                    <span className="font-medium">
+                      Correct (with prior incorrect)
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Bookmark className="w-5 h-5 fill-yellow-500 text-yellow-500" />

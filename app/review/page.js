@@ -1,0 +1,335 @@
+"use client";
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { useUserData } from '@/contexts/user-data-context';
+import { ArrowLeft, Bookmark, XCircle, CheckCircle } from 'lucide-react';
+
+export default function ReviewPage() {
+  const router = useRouter();
+  const userData = useUserData();
+  const [allQuestions, setAllQuestions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all'); // 'all', 'bookmarked', 'incorrect', 'correct'
+
+  // Load all questions
+  useEffect(() => {
+    async function loadQuestions() {
+      try {
+        const response = await fetch('/api/questions');
+        if (!response.ok) throw new Error('Failed to load questions');
+        const questions = await response.json();
+        setAllQuestions(questions);
+      } catch (error) {
+        console.error('Error loading questions:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadQuestions();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-2xl font-bold text-gray-900 mb-2">Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Get question lists
+  const bookmarkedIds = userData.bookmarks || [];
+  const incorrectIds = userData.getIncorrectQuestionIds();
+  const answeredQuestions = userData.getAllAnsweredQuestions();
+  const correctIds = Object.entries(answeredQuestions)
+    .filter(([, history]) => history.lastCorrect)
+    .map(([id]) => id);
+
+  // Filter questions based on selection
+  let filteredQuestions = [];
+  let filterTitle = 'All Reviewed Questions';
+  let filterIcon = null;
+
+  switch (filter) {
+    case 'bookmarked':
+      filteredQuestions = allQuestions.filter(q => bookmarkedIds.includes(q.questionId));
+      filterTitle = 'Bookmarked Questions';
+      filterIcon = <Bookmark className="w-5 h-5 text-yellow-600" />;
+      break;
+    case 'incorrect':
+      filteredQuestions = allQuestions.filter(q => incorrectIds.includes(q.questionId));
+      filterTitle = 'Incorrect Answers';
+      filterIcon = <XCircle className="w-5 h-5 text-red-600" />;
+      break;
+    case 'correct':
+      filteredQuestions = allQuestions.filter(q => correctIds.includes(q.questionId));
+      filterTitle = 'Correct Answers';
+      filterIcon = <CheckCircle className="w-5 h-5 text-green-600" />;
+      break;
+    default:
+      const allReviewedIds = new Set([...bookmarkedIds, ...Object.keys(answeredQuestions)]);
+      filteredQuestions = allQuestions.filter(q => allReviewedIds.has(q.questionId));
+      filterTitle = 'All Reviewed Questions';
+  }
+
+  const hasAnyProgress = Object.keys(answeredQuestions).length > 0 || bookmarkedIds.length > 0;
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="flex items-center gap-4 mb-4">
+            <Button
+              variant="outline"
+              onClick={() => router.push('/')}
+              size="sm"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Practice
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Review Questions</h1>
+              <p className="text-gray-600 mt-1">Review your bookmarked and attempted questions</p>
+            </div>
+          </div>
+
+          {/* Filter Tabs */}
+          <div className="flex gap-2">
+            <Button
+              variant={filter === 'all' ? 'default' : 'outline'}
+              onClick={() => setFilter('all')}
+              size="sm"
+            >
+              All ({Object.keys(answeredQuestions).length + bookmarkedIds.length})
+            </Button>
+            <Button
+              variant={filter === 'bookmarked' ? 'default' : 'outline'}
+              onClick={() => setFilter('bookmarked')}
+              size="sm"
+            >
+              <Bookmark className="w-4 h-4 mr-1" />
+              Bookmarked ({bookmarkedIds.length})
+            </Button>
+            <Button
+              variant={filter === 'incorrect' ? 'default' : 'outline'}
+              onClick={() => setFilter('incorrect')}
+              size="sm"
+            >
+              <XCircle className="w-4 h-4 mr-1" />
+              Incorrect ({incorrectIds.length})
+            </Button>
+            <Button
+              variant={filter === 'correct' ? 'default' : 'outline'}
+              onClick={() => setFilter('correct')}
+              size="sm"
+            >
+              <CheckCircle className="w-4 h-4 mr-1" />
+              Correct ({correctIds.length})
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {!hasAnyProgress ? (
+          // Empty State
+          <Card className="p-12 text-center">
+            <div className="text-6xl mb-4">📚</div>
+            <div className="text-2xl font-bold text-gray-900 mb-2">No Questions to Review</div>
+            <div className="text-gray-600 mb-6">
+              Start answering questions and bookmarking them to build your review list!
+            </div>
+            <Button onClick={() => router.push('/')}>
+              Start Practicing
+            </Button>
+          </Card>
+        ) : filteredQuestions.length === 0 ? (
+          // No results for current filter
+          <Card className="p-12 text-center">
+            <div className="text-6xl mb-4">🔍</div>
+            <div className="text-2xl font-bold text-gray-900 mb-2">
+              No {filter === 'bookmarked' ? 'Bookmarked' : filter === 'incorrect' ? 'Incorrect' : filter === 'correct' ? 'Correct' : ''} Questions
+            </div>
+            <div className="text-gray-600 mb-6">
+              {filter === 'bookmarked' && "Use the 'Mark for Review' button to bookmark questions."}
+              {filter === 'incorrect' && "Great! You haven't gotten any questions wrong yet."}
+              {filter === 'correct' && "Start answering questions correctly to see them here."}
+            </div>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={() => setFilter('all')} variant="outline">
+                View All
+              </Button>
+              <Button onClick={() => router.push('/')}>
+                Continue Practicing
+              </Button>
+            </div>
+          </Card>
+        ) : (
+          <>
+            {/* Results Header */}
+            <div className="flex items-center gap-3 mb-6">
+              {filterIcon}
+              <h2 className="text-2xl font-bold text-gray-900">
+                {filterTitle}
+                <span className="text-gray-500 font-normal ml-2">
+                  ({filteredQuestions.length} {filteredQuestions.length === 1 ? 'question' : 'questions'})
+                </span>
+              </h2>
+            </div>
+
+            {/* Question List */}
+            <div className="space-y-3">
+              {filteredQuestions.map((question, index) => {
+                const history = userData.getQuestionHistory(question.questionId);
+                const isBookmarked = bookmarkedIds.includes(question.questionId);
+                const isCorrect = history?.lastCorrect;
+                const attempts = history?.attempts?.length || 0;
+
+                // Get question stem preview - SHOW FULL CONTENT FOR NOW
+                let questionPreview = '';
+                if (Array.isArray(question.detail)) {
+                  // Math format
+                  questionPreview = question.detail[0]?.stem || '';
+                } else {
+                  // Reading format
+                  questionPreview = question.detail?.stem || '';
+                }
+
+                // Don't truncate for debugging - show everything
+                // (We'll optimize this later once tables work)
+
+                return (
+                  <Card
+                    key={question.questionId}
+                    className="p-4 hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => router.push(`/question/${question.questionId}?from=review`)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Badge variant="outline">
+                            Question {index + 1}
+                          </Badge>
+
+                          {/* Question ID */}
+                          <span className="text-xs text-gray-400 font-mono">
+                            ID: {question.questionId}
+                          </span>
+
+                          {/* Status Badges */}
+                          {isBookmarked && (
+                            <Badge className="bg-yellow-100 text-yellow-800">
+                              <Bookmark className="w-3 h-3 mr-1 fill-yellow-600" />
+                              Bookmarked
+                            </Badge>
+                          )}
+                          {history && (
+                            <Badge
+                              className={
+                                isCorrect
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-red-100 text-red-800"
+                              }
+                            >
+                              {isCorrect ? (
+                                <>
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  Correct
+                                </>
+                              ) : (
+                                <>
+                                  <XCircle className="w-3 h-3 mr-1" />
+                                  Incorrect
+                                </>
+                              )}
+                            </Badge>
+                          )}
+                          {attempts > 0 && (
+                            <span className="text-sm text-gray-500">
+                              {attempts} {attempts === 1 ? 'attempt' : 'attempts'}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="font-medium text-gray-900">
+                            {question.skill_desc}
+                          </div>
+
+                          {/* Question Preview */}
+                          {questionPreview && (
+                            <div
+                              className="text-sm leading-relaxed max-w-none question-preview"
+                              dangerouslySetInnerHTML={{ __html: questionPreview }}
+                              style={{
+                                display: 'block',
+                                width: '100%'
+                              }}
+                            />
+                          )}
+
+                          <div className="text-sm text-gray-600 flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              {question.subject === 'math' ? 'Math' : 'Reading & Writing'}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {question.primary_class_cd_desc}
+                            </Badge>
+                            <Badge
+                              className={`text-xs ${
+                                question.difficulty === 'E'
+                                  ? 'bg-green-100 text-green-800'
+                                  : question.difficulty === 'M'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-red-100 text-red-800'
+                              }`}
+                            >
+                              {question.difficulty === 'E' ? 'Easy' : question.difficulty === 'M' ? 'Medium' : 'Hard'}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+
+                      <Button size="sm" variant="outline">
+                        Review
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Practice All Button */}
+            {filteredQuestions.length > 0 && (
+              <Card className="p-6 mt-8 text-center">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Ready to practice these questions?
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Review all {filteredQuestions.length} questions in sequence
+                </p>
+                <Button
+                  onClick={() => {
+                    if (filteredQuestions[0]) {
+                      router.push(`/question/${filteredQuestions[0].questionId}?from=review`);
+                    }
+                  }}
+                >
+                  Start Review Session
+                </Button>
+              </Card>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

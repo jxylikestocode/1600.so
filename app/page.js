@@ -2,6 +2,8 @@ import { getAllQuestions } from "@/lib/data";
 import { FilterProvider } from "@/contexts/filter-context";
 import { FilterPanel } from "@/components/filter-panel";
 import { QuestionCountSummary } from "@/components/question-count-summary";
+import Link from "next/link";
+import { BarChart3, BookMarked } from "lucide-react";
 
 /**
  * Home Page - Test Page
@@ -22,7 +24,27 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto space-y-6">
-        <h1 className="text-4xl font-bold mb-8">1600.so - SAT Question Bank</h1>
+        {/* Header with Navigation */}
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-4xl font-bold">1600.so - SAT Question Bank</h1>
+
+          <div className="flex items-center gap-3">
+            <Link
+              href="/stats"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700 font-medium"
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>My Progress</span>
+            </Link>
+            <Link
+              href="/review"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700 font-medium"
+            >
+              <BookMarked className="w-4 h-4" />
+              <span>Review</span>
+            </Link>
+          </div>
+        </div>
 
         {/* Wrap everything in FilterProvider so filters work */}
         <FilterProvider>
