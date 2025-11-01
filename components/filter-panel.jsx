@@ -42,11 +42,11 @@ export function FilterPanel() {
       <CardContent className="space-y-4">
         {/* All filters on the same row */}
         <div className="flex items-start gap-4 flex-wrap">
-          <ActiveQuestionsFilter />
-          <ReleasedFilter />
-          <ProgramFilter />
+          {/* <ActiveQuestionsFilter /> */}
+          {/* <ReleasedFilter /> */}
+          {/* <ProgramFilter /> */}
           <DifficultyFilter />
-          <StatusFilters />
+          {/* <StatusFilters /> */}
         </div>
 
         {/* Reset button at bottom right */}
