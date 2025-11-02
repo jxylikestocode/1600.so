@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useUserData } from '@/contexts/user-data-context';
-import { ArrowLeft, Bookmark, XCircle, CheckCircle, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Bookmark, XCircle, CheckCircle, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function ReviewPage() {
   const router = useRouter();
@@ -14,6 +14,8 @@ export default function ReviewPage() {
   const [allQuestions, setAllQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // 'all', 'bookmarked', 'incorrect', 'correct', 'correct-with-prior-incorrect'
+  const [currentPage, setCurrentPage] = useState(1);
+  const questionsPerPage = 10;
 
   // Load all questions
   useEffect(() => {
@@ -88,6 +90,17 @@ export default function ReviewPage() {
   }
 
   const hasAnyProgress = Object.keys(answeredQuestions).length > 0 || bookmarkedIds.length > 0;
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredQuestions.length / questionsPerPage);
+  const startIndex = (currentPage - 1) * questionsPerPage;
+  const endIndex = startIndex + questionsPerPage;
+  const paginatedQuestions = filteredQuestions.slice(startIndex, endIndex);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -201,19 +214,27 @@ export default function ReviewPage() {
         ) : (
           <>
             {/* Results Header */}
-            <div className="flex items-center gap-3 mb-6">
-              {filterIcon}
-              <h2 className="text-2xl font-bold text-gray-900">
-                {filterTitle}
-                <span className="text-gray-500 font-normal ml-2">
-                  ({filteredQuestions.length} {filteredQuestions.length === 1 ? 'question' : 'questions'})
-                </span>
-              </h2>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                {filterIcon}
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {filterTitle}
+                  <span className="text-gray-500 font-normal ml-2">
+                    ({filteredQuestions.length} {filteredQuestions.length === 1 ? 'question' : 'questions'})
+                  </span>
+                </h2>
+              </div>
+              {totalPages > 1 && (
+                <div className="text-sm text-gray-600">
+                  Page {currentPage} of {totalPages}
+                </div>
+              )}
             </div>
 
             {/* Question List */}
             <div className="space-y-3">
-              {filteredQuestions.map((question, index) => {
+              {paginatedQuestions.map((question, index) => {
+                const absoluteIndex = startIndex + index;
                 const history = userData.getQuestionHistory(question.questionId);
                 const isBookmarked = bookmarkedIds.includes(question.questionId);
                 const isCorrect = history?.lastCorrect;
@@ -242,7 +263,7 @@ export default function ReviewPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <Badge variant="outline">
-                            Question {index + 1}
+                            Question {absoluteIndex + 1}
                           </Badge>
 
                           {/* Question ID */}
@@ -332,6 +353,86 @@ export default function ReviewPage() {
                 );
               })}
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-8">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1" />
+                  Previous
+                </Button>
+
+                <div className="flex items-center gap-1">
+                  {/* Show first page */}
+                  {currentPage > 3 && (
+                    <>
+                      <Button
+                        variant={currentPage === 1 ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(1)}
+                      >
+                        1
+                      </Button>
+                      {currentPage > 4 && (
+                        <span className="px-2 text-gray-500">...</span>
+                      )}
+                    </>
+                  )}
+
+                  {/* Show pages around current page */}
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(page => {
+                      return page === currentPage ||
+                             page === currentPage - 1 ||
+                             page === currentPage + 1 ||
+                             page === currentPage - 2 ||
+                             page === currentPage + 2;
+                    })
+                    .filter(page => page > 0 && page <= totalPages)
+                    .map(page => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+
+                  {/* Show last page */}
+                  {currentPage < totalPages - 2 && (
+                    <>
+                      {currentPage < totalPages - 3 && (
+                        <span className="px-2 text-gray-500">...</span>
+                      )}
+                      <Button
+                        variant={currentPage === totalPages ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(totalPages)}
+                      >
+                        {totalPages}
+                      </Button>
+                    </>
+                  )}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
+            )}
 
             {/* Practice All Button */}
             {filteredQuestions.length > 0 && (
