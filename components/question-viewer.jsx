@@ -575,7 +575,7 @@ export function QuestionViewer({
                   title={showCalculator ? "Hide calculator" : "Show calculator"}
                 >
                   <Calculator className="w-4 h-4" />
-                  <span className="text-sm font-medium">Calculator</span>
+                  <span className="text-sm font-medium hidden md:inline">Calculator</span>
                 </button>
               )}
 
@@ -591,7 +591,7 @@ export function QuestionViewer({
                   title={showReference ? "Hide reference" : "Show reference"}
                 >
                   <FileText className="w-4 h-4" />
-                  <span className="text-sm font-medium">Reference</span>
+                  <span className="text-sm font-medium hidden md:inline">Reference</span>
                 </button>
               )}
             </div>

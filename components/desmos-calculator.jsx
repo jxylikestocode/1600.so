@@ -22,10 +22,13 @@ export function DesmosCalculator({ isOpen, onClose }) {
   const [size, setSize] = useState({ width: 400, height: 500 });
   const [isResizing, setIsResizing] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Ensure component only renders on client
   useEffect(() => {
     setIsMounted(true);
+    // Check if mobile
+    setIsMobile(window.innerWidth < 768);
   }, []);
 
   // Initialize Desmos graphing calculator
@@ -160,23 +163,31 @@ export function DesmosCalculator({ isOpen, onClose }) {
 
   if (!isOpen || !isMounted) return null;
 
-  return (
-    <Draggable
-      nodeRef={nodeRef}
-      handle=".calculator-drag-handle"
-      position={position}
-      onStop={handleDragStop}
-      bounds="parent"
+  const handleBackdropClick = (e) => {
+    // Only close if clicking directly on the backdrop, not on the calculator
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  // On mobile, use fixed positioning; on desktop, use draggable
+  const calculatorContent = (
+    <div
+      ref={nodeRef}
+      className="bg-white rounded-lg shadow-2xl border border-gray-300 select-none max-h-[80vh] overflow-hidden"
+      style={{
+        width: `${isMaximized ? Math.min(size.width * 2, window.innerWidth * 0.9) : Math.min(size.width, window.innerWidth * 0.9)}px`,
+        height: `${Math.min(size.height, window.innerHeight * 0.8)}px`,
+        cursor: isResizing ? "nwse-resize" : "default",
+        ...(isMobile ? {
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 50,
+        } : {}),
+      }}
     >
-      <div
-        ref={nodeRef}
-        className="fixed z-50 bg-white rounded-lg shadow-2xl border border-gray-300 select-none"
-        style={{
-          width: `${isMaximized ? size.width * 2 : size.width}px`,
-          height: `${size.height}px`,
-          cursor: isResizing ? "nwse-resize" : "default",
-        }}
-      >
         {/* Header */}
         <div className="calculator-drag-handle flex items-center justify-between px-4 py-3 bg-gray-900 text-white rounded-t-lg cursor-move select-none">
           <div className="flex items-center gap-3">
@@ -282,7 +293,18 @@ export function DesmosCalculator({ isOpen, onClose }) {
             />
           </>
         )}
-      </div>
+    </div>
+  );
+
+  return isMobile ? calculatorContent : (
+    <Draggable
+      nodeRef={nodeRef}
+      handle=".calculator-drag-handle"
+      position={position}
+      onStop={handleDragStop}
+      bounds="parent"
+    >
+      {calculatorContent}
     </Draggable>
   );
 }
