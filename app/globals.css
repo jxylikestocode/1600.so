@@ -134,6 +134,35 @@
   }
 }
 
+/* MathML rendering fixes */
+math {
+  display: inline !important;
+}
+
+math * {
+  display: inline !important;
+}
+
+mfrac {
+  display: inline-flex !important;
+  flex-direction: column !important;
+  vertical-align: middle !important;
+  text-align: center !important;
+}
+
+mfrac > * {
+  display: block !important;
+}
+
+mfrac > *:first-child {
+  border-bottom: 1px solid currentColor !important;
+  padding-bottom: 0.1em !important;
+}
+
+mfrac > *:last-child {
+  padding-top: 0.1em !important;
+}
+
 /* Question preview specific styles */
 .question-preview figure.table {
   display: block !important;

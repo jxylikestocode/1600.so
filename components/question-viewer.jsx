@@ -1054,7 +1054,7 @@ export function QuestionViewer({
                   Explanation
                 </h3>
                 <div
-                  className="text-base leading-relaxed text-gray-900 [&_img]:align-middle [&_math]:inline-block"
+                  className="text-base leading-relaxed text-gray-900 [&_img]:align-middle"
                   dangerouslySetInnerHTML={{
                     __html:
                       !Array.isArray(question.detail) &&
