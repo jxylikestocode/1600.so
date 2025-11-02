@@ -11,36 +11,81 @@ import { ArrowLeft, Bookmark, XCircle, CheckCircle, ShieldCheck, ChevronLeft, Ch
 export default function ReviewPage() {
   const router = useRouter();
   const userData = useUserData();
-  const [allQuestions, setAllQuestions] = useState([]);
+  const [paginatedQuestions, setPaginatedQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // 'all', 'bookmarked', 'incorrect', 'correct', 'correct-with-prior-incorrect'
   const [currentPage, setCurrentPage] = useState(1);
+  const [filteredQuestionIds, setFilteredQuestionIds] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
   const questionsPerPage = 10;
 
-  // Load only the questions the user has interacted with
+  // Reset to page 1 when filter changes
   useEffect(() => {
-    async function loadQuestions() {
+    setCurrentPage(1);
+  }, [filter]);
+
+  // Load only the questions for the current page
+  useEffect(() => {
+    async function loadPageQuestions() {
+      setLoading(true);
       try {
-        // Get all question IDs the user has interacted with
+        // Get all question IDs based on current filter
         const bookmarkedIds = userData.bookmarks || [];
         const answeredQuestions = userData.getAllAnsweredQuestions();
         const answeredIds = Object.keys(answeredQuestions);
+        const incorrectIds = userData.getIncorrectQuestionIds();
+        const correctIds = Object.entries(answeredQuestions)
+          .filter(([, history]) => history.lastCorrect)
+          .map(([id]) => id);
+        const correctWithPriorIncorrectIds = Object.entries(answeredQuestions)
+          .filter(([, history]) => history.lastCorrect && history.attempts.length > 1)
+          .map(([id]) => id);
 
-        // Combine all unique IDs
-        const allReviewedIds = [...new Set([...bookmarkedIds, ...answeredIds])];
+        // Get filtered IDs based on current filter
+        let idsToShow = [];
+        switch (filter) {
+          case 'bookmarked':
+            idsToShow = bookmarkedIds;
+            break;
+          case 'incorrect':
+            idsToShow = incorrectIds;
+            break;
+          case 'correct':
+            idsToShow = correctIds;
+            break;
+          case 'correct-with-prior-incorrect':
+            idsToShow = correctWithPriorIncorrectIds;
+            break;
+          default:
+            const allReviewedIds = [...new Set([...bookmarkedIds, ...answeredIds])];
+            idsToShow = allReviewedIds;
+        }
 
-        // If no questions to review, just finish loading
-        if (allReviewedIds.length === 0) {
-          setAllQuestions([]);
+        setFilteredQuestionIds(idsToShow);
+        setTotalCount(idsToShow.length);
+
+        // If no questions to show, just finish loading
+        if (idsToShow.length === 0) {
+          setPaginatedQuestions([]);
           setLoading(false);
           return;
         }
 
-        // Fetch only the questions we need
-        const response = await fetch(`/api/questions/batch?ids=${allReviewedIds.join(',')}`);
+        // Calculate which questions to fetch for current page
+        const startIndex = (currentPage - 1) * questionsPerPage;
+        const endIndex = startIndex + questionsPerPage;
+        const pageIds = idsToShow.slice(startIndex, endIndex);
+
+        // Fetch only the questions for this page
+        const response = await fetch(`/api/questions/batch?ids=${pageIds.join(',')}`);
         if (!response.ok) throw new Error('Failed to load questions');
         const questions = await response.json();
-        setAllQuestions(questions);
+
+        // Sort questions to match the order of pageIds
+        const questionsMap = new Map(questions.map(q => [q.questionId, q]));
+        const sortedQuestions = pageIds.map(id => questionsMap.get(id)).filter(Boolean);
+
+        setPaginatedQuestions(sortedQuestions);
       } catch (error) {
         console.error('Error loading questions:', error);
       } finally {
@@ -48,13 +93,8 @@ export default function ReviewPage() {
       }
     }
 
-    loadQuestions();
-  }, [userData]);
-
-  // Reset to page 1 when filter changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filter]);
+    loadPageQuestions();
+  }, [userData, currentPage, filter]);
 
   if (loading) {
     return (
@@ -67,7 +107,7 @@ export default function ReviewPage() {
     );
   }
 
-  // Get question lists
+  // Get question lists for counts and metadata
   const bookmarkedIds = userData.bookmarks || [];
   const incorrectIds = userData.getIncorrectQuestionIds();
   const answeredQuestions = userData.getAllAnsweredQuestions();
@@ -78,45 +118,39 @@ export default function ReviewPage() {
     .filter(([, history]) => history.lastCorrect && history.attempts.length > 1)
     .map(([id]) => id);
 
-  // Filter questions based on selection
-  let filteredQuestions = [];
+  // Get filter metadata
   let filterTitle = 'All Reviewed Questions';
   let filterIcon = null;
 
   switch (filter) {
     case 'bookmarked':
-      filteredQuestions = allQuestions.filter(q => bookmarkedIds.includes(q.questionId));
       filterTitle = 'Bookmarked Questions';
       filterIcon = <Bookmark className="w-5 h-5 text-yellow-600" />;
       break;
     case 'incorrect':
-      filteredQuestions = allQuestions.filter(q => incorrectIds.includes(q.questionId));
       filterTitle = 'Incorrect Answers';
       filterIcon = <XCircle className="w-5 h-5 text-red-600" />;
       break;
     case 'correct':
-      filteredQuestions = allQuestions.filter(q => correctIds.includes(q.questionId));
       filterTitle = 'Correct Answers';
       filterIcon = <CheckCircle className="w-5 h-5 text-green-600" />;
       break;
     case 'correct-with-prior-incorrect':
-      filteredQuestions = allQuestions.filter(q => correctWithPriorIncorrectIds.includes(q.questionId));
       filterTitle = 'Correct (with prior incorrect)';
       filterIcon = <ShieldCheck className="w-5 h-5 text-green-600" />;
       break;
     default:
-      const allReviewedIds = new Set([...bookmarkedIds, ...Object.keys(answeredQuestions)]);
-      filteredQuestions = allQuestions.filter(q => allReviewedIds.has(q.questionId));
       filterTitle = 'All Reviewed Questions';
   }
 
   const hasAnyProgress = Object.keys(answeredQuestions).length > 0 || bookmarkedIds.length > 0;
 
+  // Calculate unique count for "All" filter
+  const allReviewedCount = new Set([...bookmarkedIds, ...Object.keys(answeredQuestions)]).size;
+
   // Pagination calculations
-  const totalPages = Math.ceil(filteredQuestions.length / questionsPerPage);
+  const totalPages = Math.ceil(totalCount / questionsPerPage);
   const startIndex = (currentPage - 1) * questionsPerPage;
-  const endIndex = startIndex + questionsPerPage;
-  const paginatedQuestions = filteredQuestions.slice(startIndex, endIndex);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -153,7 +187,7 @@ export default function ReviewPage() {
               onClick={() => setFilter('all')}
               size="sm"
             >
-              All ({Object.keys(answeredQuestions).length + bookmarkedIds.length})
+              All ({allReviewedCount})
             </Button>
             <Button
               variant={filter === 'bookmarked' ? 'default' : 'outline'}
@@ -236,7 +270,7 @@ export default function ReviewPage() {
                 <h2 className="text-2xl font-bold text-gray-900">
                   {filterTitle}
                   <span className="text-gray-500 font-normal ml-2">
-                    ({filteredQuestions.length} {filteredQuestions.length === 1 ? 'question' : 'questions'})
+                    ({totalCount} {totalCount === 1 ? 'question' : 'questions'})
                   </span>
                 </h2>
               </div>
@@ -451,18 +485,18 @@ export default function ReviewPage() {
             )}
 
             {/* Practice All Button */}
-            {filteredQuestions.length > 0 && (
+            {totalCount > 0 && (
               <Card className="p-6 mt-8 text-center">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   Ready to practice these questions?
                 </h3>
                 <p className="text-gray-600 mb-4">
-                  Review all {filteredQuestions.length} questions in sequence
+                  Review all {totalCount} questions in sequence
                 </p>
                 <Button
                   onClick={() => {
-                    if (filteredQuestions[0]) {
-                      router.push(`/question/${filteredQuestions[0].questionId}?from=review&filter=${filter}`);
+                    if (filteredQuestionIds.length > 0) {
+                      router.push(`/question/${filteredQuestionIds[0]}?from=review&filter=${filter}`);
                     }
                   }}
                 >
