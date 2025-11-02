@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,45 +10,11 @@ import { ArrowLeft, TrendingUp, Clock, Target, Flame } from "lucide-react";
 export default function StatsPage() {
   const router = useRouter();
   const userData = useUserData();
-  const [allQuestions, setAllQuestions] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  // Load questions for skill breakdown
-  useEffect(() => {
-    async function loadQuestions() {
-      try {
-        const response = await fetch("/api/questions");
-        if (!response.ok) throw new Error("Failed to load questions");
-        const questions = await response.json();
-        setAllQuestions(questions);
-      } catch (error) {
-        console.error("Error loading questions:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadQuestions();
-  }, []);
-
+  // No longer need to load questions - stats functions use stored metadata
   const stats = userData.stats;
-  const skillStats =
-    allQuestions.length > 0 ? userData.getStatsBySkill(allQuestions) : {};
-  const subjectStats =
-    allQuestions.length > 0 ? userData.getStatsBySubject(allQuestions) : {};
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mb-4"></div>
-          <div className="text-2xl font-bold text-gray-900 mb-2 animate-pulse">
-            Loading your stats...
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const skillStats = userData.getStatsBySkill();
+  const subjectStats = userData.getStatsBySubject();
 
   // Check if user has any progress
   const hasProgress = stats && stats.totalAnswered > 0;
