@@ -80,6 +80,14 @@ export default function AdminDashboard() {
       {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => router.push("/")}
+              className="text-2xl font-bold text-gray-900 hover:text-blue-600 transition-colors"
+            >
+              1600.so
+            </button>
+          </div>
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
