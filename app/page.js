@@ -28,7 +28,7 @@ export default async function Home() {
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header with Navigation */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
           <h1 className="text-4xl font-bold">1600.so - SAT Question Bank</h1>
 
           <div className="flex items-center gap-3">

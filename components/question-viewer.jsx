@@ -25,6 +25,7 @@ import {
   ChevronUp,
   MapPin,
   ArrowLeft,
+  Check,
 } from "lucide-react";
 import { DesmosCalculator } from "@/components/desmos-calculator";
 import { ReferenceSheet } from "@/components/reference-sheet";
@@ -103,21 +104,34 @@ export function QuestionViewer({
     const savedEliminations = userData.getEliminatedChoices(question.questionId);
     setEliminatedChoices(savedEliminations);
     setEliminationHistory([]);
-  }, [question.questionId, userData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question.questionId]);
 
-  // Reset button feedback when user selects a new answer (MCQ)
-  useEffect(() => {
-    if (selectedChoice && justChecked && !lastCheckWasCorrect) {
-      setJustChecked(false);
-    }
-  }, [selectedChoice, justChecked, lastCheckWasCorrect]);
+  // Track previous selected choice to detect changes
+  const [prevSelectedChoice, setPrevSelectedChoice] = useState(null);
 
-  // Reset button feedback when user types a new answer (SPR)
+  // Reset button feedback when user selects a DIFFERENT answer after checking
   useEffect(() => {
-    if (textAnswer && justChecked && !lastCheckWasCorrect) {
+    if (selectedChoice !== prevSelectedChoice && justChecked && prevSelectedChoice !== null) {
+      // User changed their selection after checking - reset the button
+      console.log('Resetting justChecked because user changed answer', { selectedChoice, prevSelectedChoice });
       setJustChecked(false);
+      setPrevSelectedChoice(selectedChoice);
     }
-  }, [textAnswer, justChecked, lastCheckWasCorrect]);
+  }, [selectedChoice, justChecked, prevSelectedChoice]);
+
+  // Track previous text answer to detect changes
+  const [prevTextAnswer, setPrevTextAnswer] = useState("");
+
+  // Reset button feedback when user types a DIFFERENT answer (SPR)
+  useEffect(() => {
+    if (textAnswer !== prevTextAnswer && justChecked && prevTextAnswer !== "") {
+      // User changed their text after checking - reset the button
+      console.log('Resetting justChecked because user changed text answer', { textAnswer, prevTextAnswer });
+      setJustChecked(false);
+      setPrevTextAnswer(textAnswer);
+    }
+  }, [textAnswer, justChecked, prevTextAnswer]);
 
   const [showNavigation, setShowNavigation] = useState(false);
 
@@ -228,17 +242,27 @@ export function QuestionViewer({
       // Correct answer - lock the question
       setIsCorrectAnswer(true);
       setIsChecked(true);
+      setJustChecked(true);
+      setLastCheckWasCorrect(true);
+      // Update previous state to prevent reset
+      setPrevSelectedChoice(selectedChoice);
+      setPrevTextAnswer(textAnswer);
     } else {
-      // Wrong answer - allow retry
+      // Wrong answer - keep selection highlighted in red, allow retry
       if (isSPR) {
-        // For SPR, just clear the input (don't track wrong attempts for text)
-        setTextAnswer("");
+        // For SPR, keep the text to show what was wrong
+        // Don't clear it - let user see their wrong answer
       } else {
-        // For MCQ, add to wrong attempts and clear selection
+        // For MCQ, add to wrong attempts but KEEP selection to show red
         setWrongAttempts((prev) => [...prev, selectedChoice]);
-        setSelectedChoice(null);
+        // Don't clear selection - keep it to show red highlight
       }
-      setIsChecked(false);
+      setIsChecked(true); // Keep checked state to show red
+      setJustChecked(true);
+      setLastCheckWasCorrect(false);
+      // Update previous state to prevent reset
+      setPrevSelectedChoice(selectedChoice);
+      setPrevTextAnswer(textAnswer);
     }
   };
 
@@ -468,7 +492,17 @@ export function QuestionViewer({
                         : "bg-red-100 text-red-800"
                     }`}
                   >
-                    {questionHistory.lastCorrect ? "✓ Correct" : "✗ Attempted"}
+                    {questionHistory.lastCorrect ? (
+                      <>
+                        <span className="hidden md:inline">✓ Correct</span>
+                        <span className="md:hidden">✓</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="hidden md:inline">✗ Attempted</span>
+                        <span className="md:hidden">✗</span>
+                      </>
+                    )}
                   </Badge>
                 )}
 
@@ -489,7 +523,7 @@ export function QuestionViewer({
                       markedForReview ? "fill-yellow-600" : ""
                     }`}
                   />
-                  <span className="text-sm font-medium">Mark for Review</span>
+                  <span className="text-sm font-medium hidden md:inline">Mark for Review</span>
                 </button>
               </div>
 
@@ -1000,11 +1034,14 @@ export function QuestionViewer({
       </div>
 
       {/* Fixed Bottom Action Buttons */}
-      <div className="bg-white border-t px-6 py-4 fixed bottom-0 left-0 right-0 z-50">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+      <div className="bg-white border-t px-2 md:px-6 py-4 fixed bottom-0 left-0 right-0 z-50">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-1 md:gap-0">
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline">Show Explanation</Button>
+              <Button variant="outline" className="shrink-0">
+                <span className="hidden md:inline">Show Explanation</span>
+                <span className="md:hidden">Explanation</span>
+              </Button>
             </PopoverTrigger>
             <PopoverContent
               className="w-[600px] max-h-[500px] overflow-y-auto"
@@ -1033,12 +1070,13 @@ export function QuestionViewer({
 
           <Popover open={showNavigation} onOpenChange={setShowNavigation}>
             <PopoverTrigger asChild>
-              <button className="px-4 py-2 mx-3 bg-gray-900 text-white rounded text-sm font-semibold hover:bg-gray-800 transition-colors flex items-center gap-2">
-                Question {currentIndex} of {totalQuestions}
+              <button className="px-2 md:px-4 py-2 mx-1 md:mx-3 bg-gray-900 text-white rounded text-sm font-semibold hover:bg-gray-800 transition-colors flex items-center gap-1 md:gap-2 whitespace-nowrap shrink-0">
+                <span className="hidden md:inline">Question {currentIndex} of {totalQuestions}</span>
+                <span className="md:hidden text-xs">{currentIndex} of {totalQuestions}</span>
                 {showNavigation ? (
-                  <ChevronDown className="w-4 h-4" />
+                  <ChevronDown className="w-4 h-4 flex-shrink-0" />
                 ) : (
-                  <ChevronUp className="w-4 h-4" />
+                  <ChevronUp className="w-4 h-4 flex-shrink-0" />
                 )}
               </button>
             </PopoverTrigger>
@@ -1174,38 +1212,57 @@ export function QuestionViewer({
             </PopoverContent>
           </Popover>
 
-          <div className="flex gap-3">
+          <div className="flex gap-1 md:gap-3 shrink-0">
             <Button
               variant="outline"
               onClick={handlePrev}
               disabled={!prevQuestionId}
+              className="shrink-0"
             >
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              Previous
-            </Button>
-            <Button onClick={handleNext} disabled={!nextQuestionId}>
-              Next
-              <ChevronRight className="w-4 h-4 ml-1" />
+              <ChevronLeft className="w-4 h-4 md:mr-1" />
+              <span className="hidden md:inline">Previous</span>
             </Button>
             <Button
               variant="outline"
+              onClick={handleNext}
+              disabled={!nextQuestionId}
+              className="shrink-0"
+            >
+              <span className="hidden md:inline">Next</span>
+              <ChevronRight className="w-4 h-4 md:ml-1" />
+            </Button>
+            <Button
               onClick={handleCheck}
               disabled={
                 isCorrectAnswer || (!selectedChoice && !textAnswer.trim())
               }
-              className={
+              variant={justChecked ? "default" : "default"}
+              className={`shrink-0 ${
                 justChecked
                   ? lastCheckWasCorrect
-                    ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
-                    : "bg-red-600 text-white border-red-600 hover:bg-red-700"
+                    ? "!bg-green-600 !text-white !border-green-600 hover:!bg-green-700"
+                    : "!bg-red-600 !text-white !border-red-600 hover:!bg-red-700"
                   : ""
-              }
+              }`}
             >
-              {justChecked
-                ? lastCheckWasCorrect
-                  ? "✓ Correct"
-                  : "✗ Incorrect"
-                : "Check"}
+              {justChecked ? (
+                lastCheckWasCorrect ? (
+                  <>
+                    <span className="hidden md:inline">✓ Correct</span>
+                    <span className="md:hidden">✓</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="hidden md:inline">✗ Incorrect</span>
+                    <span className="md:hidden">✗</span>
+                  </>
+                )
+              ) : (
+                <>
+                  <span className="hidden md:inline">Check</span>
+                  <Check className="w-4 h-4 md:hidden" />
+                </>
+              )}
             </Button>
           </div>
         </div>
