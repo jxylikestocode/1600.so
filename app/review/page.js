@@ -35,6 +35,11 @@ export default function ReviewPage() {
     loadQuestions();
   }, []);
 
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -90,11 +95,6 @@ export default function ReviewPage() {
   }
 
   const hasAnyProgress = Object.keys(answeredQuestions).length > 0 || bookmarkedIds.length > 0;
-
-  // Reset to page 1 when filter changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filter]);
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredQuestions.length / questionsPerPage);
