@@ -6,14 +6,14 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useUserData } from '@/contexts/user-data-context';
-import { ArrowLeft, Bookmark, XCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Bookmark, XCircle, CheckCircle, ShieldCheck } from 'lucide-react';
 
 export default function ReviewPage() {
   const router = useRouter();
   const userData = useUserData();
   const [allQuestions, setAllQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all'); // 'all', 'bookmarked', 'incorrect', 'correct'
+  const [filter, setFilter] = useState('all'); // 'all', 'bookmarked', 'incorrect', 'correct', 'correct-with-prior-incorrect'
 
   // Load all questions
   useEffect(() => {
@@ -50,6 +50,9 @@ export default function ReviewPage() {
   const correctIds = Object.entries(answeredQuestions)
     .filter(([, history]) => history.lastCorrect)
     .map(([id]) => id);
+  const correctWithPriorIncorrectIds = Object.entries(answeredQuestions)
+    .filter(([, history]) => history.lastCorrect && history.attempts > 1)
+    .map(([id]) => id);
 
   // Filter questions based on selection
   let filteredQuestions = [];
@@ -71,6 +74,11 @@ export default function ReviewPage() {
       filteredQuestions = allQuestions.filter(q => correctIds.includes(q.questionId));
       filterTitle = 'Correct Answers';
       filterIcon = <CheckCircle className="w-5 h-5 text-green-600" />;
+      break;
+    case 'correct-with-prior-incorrect':
+      filteredQuestions = allQuestions.filter(q => correctWithPriorIncorrectIds.includes(q.questionId));
+      filterTitle = 'Correct (with prior incorrect)';
+      filterIcon = <ShieldCheck className="w-5 h-5 text-green-600" />;
       break;
     default:
       const allReviewedIds = new Set([...bookmarkedIds, ...Object.keys(answeredQuestions)]);
@@ -101,7 +109,7 @@ export default function ReviewPage() {
           </div>
 
           {/* Filter Tabs */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant={filter === 'all' ? 'default' : 'outline'}
               onClick={() => setFilter('all')}
@@ -133,6 +141,14 @@ export default function ReviewPage() {
               <CheckCircle className="w-4 h-4 mr-1" />
               Correct ({correctIds.length})
             </Button>
+            <Button
+              variant={filter === 'correct-with-prior-incorrect' ? 'default' : 'outline'}
+              onClick={() => setFilter('correct-with-prior-incorrect')}
+              size="sm"
+            >
+              <ShieldCheck className="w-4 h-4 mr-1" />
+              Correct (with prior incorrect) ({correctWithPriorIncorrectIds.length})
+            </Button>
           </div>
         </div>
       </div>
@@ -156,12 +172,13 @@ export default function ReviewPage() {
           <Card className="p-12 text-center">
             <div className="text-6xl mb-4">🔍</div>
             <div className="text-2xl font-bold text-gray-900 mb-2">
-              No {filter === 'bookmarked' ? 'Bookmarked' : filter === 'incorrect' ? 'Incorrect' : filter === 'correct' ? 'Correct' : ''} Questions
+              No {filter === 'bookmarked' ? 'Bookmarked' : filter === 'incorrect' ? 'Incorrect' : filter === 'correct' ? 'Correct' : filter === 'correct-with-prior-incorrect' ? 'Correct (with prior incorrect)' : ''} Questions
             </div>
             <div className="text-gray-600 mb-6">
               {filter === 'bookmarked' && "Use the 'Mark for Review' button to bookmark questions."}
               {filter === 'incorrect' && "Great! You haven't gotten any questions wrong yet."}
               {filter === 'correct' && "Start answering questions correctly to see them here."}
+              {filter === 'correct-with-prior-incorrect' && "No questions where you got correct after previous incorrect attempts."}
             </div>
             <div className="flex gap-3 justify-center">
               <Button onClick={() => setFilter('all')} variant="outline">
