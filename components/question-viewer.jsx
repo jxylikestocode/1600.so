@@ -1202,13 +1202,13 @@ export function QuestionViewer({
                           textClass = "text-white";
                         } else {
                           // Correct on first try
-                          borderClass = "border-2 border-green-500";
+                          borderClass = "";
                           bgClass = "bg-green-500";
                           textClass = "text-white";
                         }
                       } else {
                         // Incorrect answer
-                        borderClass = "border-2 border-red-500";
+                        borderClass = "";
                         bgClass = "bg-red-500";
                         textClass = "text-white";
                       }
