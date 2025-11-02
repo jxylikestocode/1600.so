@@ -1182,6 +1182,41 @@ export function QuestionViewer({
                     const questionNum = idx + 1;
                     const isCurrent = questionNum === currentIndex;
 
+                    // Get question status from userData
+                    const questionHistory = userData.getQuestionHistory(q.questionId);
+                    const isBookmarked = userData.isBookmarked(q.questionId);
+
+                    // Determine styling based on status
+                    let buttonClass = "relative w-14 h-14 rounded font-semibold text-lg transition-all hover:bg-gray-50 ";
+                    let borderClass = "";
+                    let bgClass = "bg-white";
+                    let textClass = "text-blue-600";
+
+                    if (questionHistory) {
+                      if (questionHistory.lastCorrect) {
+                        // Correct answer
+                        if (questionHistory.attempts > 1) {
+                          // Correct with prior incorrect attempts
+                          borderClass = "border-2 border-green-500";
+                          bgClass = "bg-red-500";
+                          textClass = "text-white";
+                        } else {
+                          // Correct on first try
+                          borderClass = "border-2 border-green-500";
+                          bgClass = "bg-green-500";
+                          textClass = "text-white";
+                        }
+                      } else {
+                        // Incorrect answer
+                        borderClass = "border-2 border-red-500";
+                        bgClass = "bg-red-500";
+                        textClass = "text-white";
+                      }
+                    } else {
+                      // Unanswered
+                      borderClass = "border-2 border-dashed border-gray-400";
+                    }
+
                     return (
                       <button
                         key={q.questionId}
@@ -1189,14 +1224,15 @@ export function QuestionViewer({
                           router.push(buildQuestionUrl(q.questionId));
                           setShowNavigation(false);
                         }}
-                        className={`relative w-14 h-14 rounded border-2 border-dashed border-gray-400 font-semibold text-lg transition-all hover:bg-gray-50 ${
-                          isCurrent ? "bg-white" : "bg-white"
-                        }`}
+                        className={`${buttonClass} ${borderClass} ${bgClass}`}
                       >
                         {isCurrent && (
                           <MapPin className="w-4 h-4 absolute -top-2 left-1/2 -translate-x-1/2" />
                         )}
-                        <span className="text-blue-600">{questionNum}</span>
+                        <span className={textClass}>{questionNum}</span>
+                        {isBookmarked && (
+                          <Bookmark className="w-3 h-3 absolute -bottom-1 right-0 fill-yellow-500 text-yellow-500" />
+                        )}
                       </button>
                     );
                   })}
