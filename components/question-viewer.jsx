@@ -48,6 +48,7 @@ export function QuestionViewer({
   selectedBands,
   allFilteredQuestions,
   isReviewMode = false,
+  reviewFilter = 'all',
 }) {
   const router = useRouter();
   const userData = useUserData();
@@ -69,6 +70,49 @@ export function QuestionViewer({
   const [eliminatedChoices, setEliminatedChoices] = useState([]);
   const [eliminationHistory, setEliminationHistory] = useState([]);
   const [questionHistory, setQuestionHistory] = useState(null);
+
+  // Filter questions based on review filter if in review mode
+  const actualFilteredQuestions = useMemo(() => {
+    if (!isReviewMode) {
+      return allFilteredQuestions;
+    }
+
+    // Get user data for filtering
+    const bookmarkedIds = userData.bookmarks || [];
+    const answeredQuestions = userData.getAllAnsweredQuestions();
+    const incorrectIds = Object.entries(answeredQuestions)
+      .filter(([, history]) => !history.lastCorrect)
+      .map(([id]) => id);
+    const correctIds = Object.entries(answeredQuestions)
+      .filter(([, history]) => history.lastCorrect)
+      .map(([id]) => id);
+    const correctWithPriorIncorrectIds = Object.entries(answeredQuestions)
+      .filter(([, history]) => history.lastCorrect && history.attempts.length > 1)
+      .map(([id]) => id);
+
+    // Filter based on review filter type
+    switch (reviewFilter) {
+      case 'bookmarked':
+        return allFilteredQuestions.filter(q => bookmarkedIds.includes(q.questionId));
+      case 'incorrect':
+        return allFilteredQuestions.filter(q => incorrectIds.includes(q.questionId));
+      case 'correct':
+        return allFilteredQuestions.filter(q => correctIds.includes(q.questionId));
+      case 'correct-with-prior-incorrect':
+        return allFilteredQuestions.filter(q => correctWithPriorIncorrectIds.includes(q.questionId));
+      default: // 'all'
+        const allReviewedIds = new Set([...bookmarkedIds, ...Object.keys(answeredQuestions)]);
+        return allFilteredQuestions.filter(q => allReviewedIds.has(q.questionId));
+    }
+  }, [isReviewMode, reviewFilter, allFilteredQuestions, userData]);
+
+  // Recalculate currentIndex and totalQuestions based on filtered questions
+  const actualCurrentIndex = useMemo(() => {
+    const index = actualFilteredQuestions.findIndex(q => q.questionId === question.questionId);
+    return index === -1 ? 0 : index + 1;
+  }, [actualFilteredQuestions, question.questionId]);
+
+  const actualTotalQuestions = actualFilteredQuestions.length;
 
   // Debug: Log the full question to console only once when question changes
   useEffect(() => {
@@ -268,6 +312,15 @@ export function QuestionViewer({
   };
 
   const buildQuestionUrl = (questionId) => {
+    if (isReviewMode) {
+      // If in review mode, preserve the review filter
+      const params = new URLSearchParams({
+        from: 'review',
+        filter: reviewFilter,
+      });
+      return `/question/${questionId}?${params.toString()}`;
+    }
+
     if (skill && subject) {
       const params = new URLSearchParams({
         skill: skill,
@@ -305,13 +358,13 @@ export function QuestionViewer({
     const questionNum = parseInt(jumpToInput, 10);
 
     // Validate input
-    if (isNaN(questionNum) || questionNum < 1 || questionNum > totalQuestions) {
-      alert(`Please enter a number between 1 and ${totalQuestions}`);
+    if (isNaN(questionNum) || questionNum < 1 || questionNum > actualTotalQuestions) {
+      alert(`Please enter a number between 1 and ${actualTotalQuestions}`);
       return;
     }
 
     // Get the question at that index (questionNum - 1 because index is 0-based)
-    const targetQuestion = allFilteredQuestions[questionNum - 1];
+    const targetQuestion = actualFilteredQuestions[questionNum - 1];
     if (targetQuestion) {
       router.push(buildQuestionUrl(targetQuestion.questionId));
       setJumpToInput(""); // Clear input after navigation
@@ -420,7 +473,7 @@ export function QuestionViewer({
           <div className="flex items-center gap-6 text-xs text-gray-700">
             <div className="flex items-center gap-2">
               <span className="font-semibold">Total Questions</span>
-              <span className="font-bold text-gray-900">{totalQuestions}</span>
+              <span className="font-bold text-gray-900">{actualTotalQuestions}</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -1072,8 +1125,8 @@ export function QuestionViewer({
           <Popover open={showNavigation} onOpenChange={setShowNavigation}>
             <PopoverTrigger asChild>
               <button className="px-2 md:px-4 py-2 mx-1 md:mx-3 bg-gray-900 text-white rounded text-sm font-semibold hover:bg-gray-800 transition-colors flex items-center gap-1 md:gap-2 whitespace-nowrap shrink-0">
-                <span className="hidden md:inline">Question {currentIndex} of {totalQuestions}</span>
-                <span className="md:hidden text-xs">{currentIndex} of {totalQuestions}</span>
+                <span className="hidden md:inline">Question {actualCurrentIndex} of {actualTotalQuestions}</span>
+                <span className="md:hidden text-xs">{actualCurrentIndex} of {actualTotalQuestions}</span>
                 {showNavigation ? (
                   <ChevronDown className="w-4 h-4 flex-shrink-0" />
                 ) : (
@@ -1179,7 +1232,7 @@ export function QuestionViewer({
 
                 {/* Question Grid */}
                 <div className="flex flex-wrap gap-3 justify-center">
-                  {allFilteredQuestions.map((q, idx) => {
+                  {actualFilteredQuestions.map((q, idx) => {
                     const questionNum = idx + 1;
                     const isCurrent = questionNum === currentIndex;
 

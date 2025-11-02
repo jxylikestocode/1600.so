@@ -227,7 +227,7 @@ export default function ReviewPage() {
                   <Card
                     key={question.questionId}
                     className="p-4 hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => router.push(`/question/${question.questionId}?from=review`)}
+                    onClick={() => router.push(`/question/${question.questionId}?from=review&filter=${filter}`)}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -336,7 +336,7 @@ export default function ReviewPage() {
                 <Button
                   onClick={() => {
                     if (filteredQuestions[0]) {
-                      router.push(`/question/${filteredQuestions[0].questionId}?from=review`);
+                      router.push(`/question/${filteredQuestions[0].questionId}?from=review&filter=${filter}`);
                     }
                   }}
                 >

@@ -19,6 +19,7 @@ export default async function QuestionPage({ params, searchParams }) {
   const subject = resolvedSearchParams.subject;
   const bandsParam = resolvedSearchParams.bands;
   const fromReview = resolvedSearchParams.from === 'review';
+  const reviewFilter = resolvedSearchParams.filter || 'all';
 
   // Parse selected bands from URL
   const selectedBands = bandsParam
@@ -37,14 +38,21 @@ export default async function QuestionPage({ params, searchParams }) {
 
   // Filter questions by skill and difficulty bands if provided
   let filteredQuestions = allQuestions;
-  if (skill && subject) {
+
+  if (fromReview) {
+    // If from review page, filter based on review filter type
+    // This would need access to user data, which is client-side only
+    // For now, we'll pass the filter type to the client component
+    // and let it handle the filtering
+    filteredQuestions = allQuestions; // Will be filtered on client side
+  } else if (skill && subject) {
     filteredQuestions = allQuestions.filter(
       (q) => q.subject === subject && q.skill_desc === skill
     );
   }
 
-  // Apply difficulty band filter if selected
-  if (selectedBands.length > 0) {
+  // Apply difficulty band filter if selected (only if not from review)
+  if (!fromReview && selectedBands.length > 0) {
     filteredQuestions = filteredQuestions.filter(
       (q) => selectedBands.includes(q.score_band_range_cd)
     );
@@ -75,6 +83,7 @@ export default async function QuestionPage({ params, searchParams }) {
       selectedBands={selectedBands}
       allFilteredQuestions={filteredQuestions}
       isReviewMode={fromReview}
+      reviewFilter={reviewFilter}
     />
   );
 }
