@@ -32,6 +32,7 @@ import { DesmosCalculator } from "@/components/desmos-calculator";
 import { ReferenceSheet } from "@/components/reference-sheet";
 import { useUserData } from "@/contexts/user-data-context";
 import { trackAnswer, trackFeature, trackNavigation } from "@/lib/analytics";
+import { AuthButton } from "@/components/auth/auth-button";
 
 /**
  * QuestionViewer Component
@@ -594,6 +595,9 @@ export function QuestionViewer({
                   <span className="text-sm font-medium hidden md:inline">Reference</span>
                 </button>
               )}
+
+              {/* Auth Button */}
+              <AuthButton />
             </div>
           </div>
         </div>

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useUserData } from '@/contexts/user-data-context';
 import { ArrowLeft, Bookmark, XCircle, CheckCircle, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
+import { AuthButton } from '@/components/auth/auth-button';
 
 export default function ReviewPage() {
   const router = useRouter();
@@ -242,6 +243,7 @@ export default function ReviewPage() {
             >
               1600.so
             </button>
+            <AuthButton />
           </div>
           <div className="flex items-center gap-4 mb-4">
             <Button

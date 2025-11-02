@@ -6,15 +6,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useUserData } from "@/contexts/user-data-context";
 import { ArrowLeft, TrendingUp, Clock, Target, Flame } from "lucide-react";
+import { AuthButton } from "@/components/auth/auth-button";
 
 export default function StatsPage() {
   const router = useRouter();
   const userData = useUserData();
 
   // No longer need to load questions - stats functions use stored metadata
-  const stats = userData.stats;
-  const skillStats = userData.getStatsBySkill();
-  const subjectStats = userData.getStatsBySubject();
+  const stats = userData.stats || { totalAnswered: 0, correctCount: 0, accuracy: 0, totalTimeSpent: 0, averageTimePerQuestion: 0, streakDays: 0 };
+  const skillStats = userData.getStatsBySkill() || {};
+  const subjectStats = userData.getStatsBySubject() || {};
 
   // Check if user has any progress
   const hasProgress = stats && stats.totalAnswered > 0;
@@ -31,6 +32,7 @@ export default function StatsPage() {
             >
               1600.so
             </button>
+            <AuthButton />
           </div>
           <div className="flex items-center gap-4">
             <Button

@@ -2,6 +2,10 @@
 
 import { createContext, useContext, useState, useEffect } from 'react';
 import * as storage from '@/lib/local-storage';
+import { useAuth } from '@/hooks/useAuth';
+import * as supabaseData from '@/lib/supabase-data';
+import { performFullMigration, hasUserMigratedData, migrateTempUserToAuth } from '@/lib/migration';
+import { LoginModal } from '@/components/auth/login-modal';
 
 const UserDataContext = createContext(null);
 
@@ -9,6 +13,22 @@ export function UserDataProvider({ children }) {
   const [stats, setStats] = useState(null);
   const [bookmarks, setBookmarks] = useState([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [syncStatus, setSyncStatus] = useState('idle'); // 'idle', 'syncing', 'synced', 'error'
+  const [lastSyncTime, setLastSyncTime] = useState(null);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+
+  const { user, isAuthenticated } = useAuth();
+
+  // Get current user ID (auth user or temp user)
+  const getUserId = async () => {
+    if (isAuthenticated && user) {
+      return user.id;
+    }
+
+    // For anonymous users, create or get temp user
+    const tempUserResult = await supabaseData.getOrCreateTempUser();
+    return tempUserResult.success ? tempUserResult.userId : null;
+  };
 
   // Load initial data
   useEffect(() => {
@@ -18,28 +38,168 @@ export function UserDataProvider({ children }) {
     }
   }, [refreshTrigger]);
 
+  // Sync with Supabase when user logs in
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      loadFromSupabase(user.id);
+    }
+  }, [isAuthenticated, user]);
+
   // Force refresh of all data
   const refresh = () => {
     setRefreshTrigger(prev => prev + 1);
   };
 
-  // Save answer and refresh stats
-  const saveAnswer = (questionId, answer, isCorrect, timeSpent, questionMeta) => {
+  // Load data from Supabase and update localStorage
+  const loadFromSupabase = async (userId) => {
+    try {
+      setSyncStatus('syncing');
+
+      // Mark that this user has an account (even if no data migrated yet)
+      storage.markUserHasAccount();
+
+      // Check if user has already migrated
+      const alreadyMigrated = await hasUserMigratedData(userId);
+
+      if (!alreadyMigrated) {
+        // Check for temp user data to migrate
+        const tempUserId = localStorage.getItem('temp_user_id');
+        if (tempUserId) {
+          console.log('Migrating temp user data to authenticated user');
+          await migrateTempUserToAuth(tempUserId, userId);
+        } else {
+          // Migrate localStorage data
+          console.log('Migrating localStorage data to Supabase');
+          await performFullMigration(userId);
+        }
+      }
+
+      // Fetch data from Supabase
+      const result = await supabaseData.fetchUserDataFromSupabase(userId);
+
+      if (result.success && result.data) {
+        // Only update localStorage if Supabase has actual data
+        // Check if there's any meaningful data (answers, bookmarks, etc.)
+        const hasData =
+          (result.data.answers && Object.keys(result.data.answers).length > 0) ||
+          (result.data.bookmarks && result.data.bookmarks.length > 0) ||
+          (result.data.eliminatedChoices && Object.keys(result.data.eliminatedChoices).length > 0);
+
+        if (hasData) {
+          console.log('Updating localStorage with Supabase data');
+          storage.importData(result.data);
+        } else {
+          console.log('Supabase has no data yet, keeping localStorage data');
+        }
+
+        refresh();
+        setSyncStatus('synced');
+        setLastSyncTime(new Date());
+      } else {
+        console.error('Failed to load from Supabase:', result.error);
+        setSyncStatus('error');
+      }
+    } catch (error) {
+      console.error('Error loading from Supabase:', error);
+      setSyncStatus('error');
+    }
+  };
+
+  // Sync localStorage to Supabase
+  const syncToSupabase = async () => {
+    const userId = await getUserId();
+    if (!userId) return;
+
+    try {
+      setSyncStatus('syncing');
+      await performFullMigration(userId);
+      setSyncStatus('synced');
+      setLastSyncTime(new Date());
+    } catch (error) {
+      console.error('Error syncing to Supabase:', error);
+      setSyncStatus('error');
+    }
+  };
+
+  // Save answer (dual-write: localStorage + Supabase)
+  const saveAnswer = async (questionId, answer, isCorrect, timeSpent, questionMeta) => {
+    // Trigger login prompt if user has account but is logged out
+    if (storage.hasUserAccount() && !isAuthenticated) {
+      setShowLoginPrompt(true);
+      return { success: false, error: 'Please log in to save your progress', requiresLogin: true };
+    }
+
+    // Write to localStorage immediately (always works, even offline)
     const result = storage.saveAnswer(questionId, answer, isCorrect, timeSpent, questionMeta);
     refresh();
+
+    // Write to Supabase asynchronously (only for authenticated users)
+    if (isAuthenticated && user) {
+      try {
+        await supabaseData.saveAnswerToSupabase(
+          user.id,
+          questionId,
+          answer,
+          isCorrect,
+          timeSpent,
+          questionMeta
+        );
+      } catch (error) {
+        console.error('Failed to save answer to Supabase:', error);
+        // Don't throw - we still have localStorage data
+      }
+    }
+
     return result;
   };
 
-  // Toggle bookmark and refresh
-  const toggleBookmark = (questionId) => {
+  // Toggle bookmark (dual-write)
+  const toggleBookmark = async (questionId) => {
+    // Trigger login prompt if user has account but is logged out
+    if (storage.hasUserAccount() && !isAuthenticated) {
+      setShowLoginPrompt(true);
+      return { requiresLogin: true };
+    }
+
+    // Write to localStorage immediately
     const isBookmarked = storage.toggleBookmark(questionId);
     refresh();
+
+    // Write to Supabase asynchronously (only for authenticated users)
+    if (isAuthenticated && user) {
+      try {
+        if (isBookmarked) {
+          await supabaseData.saveBookmarkToSupabase(user.id, questionId);
+        } else {
+          await supabaseData.removeBookmarkFromSupabase(user.id, questionId);
+        }
+      } catch (error) {
+        console.error('Failed to sync bookmark to Supabase:', error);
+      }
+    }
+
     return isBookmarked;
   };
 
-  // Save eliminated choices
-  const saveEliminatedChoices = (questionId, choiceIds) => {
+  // Save eliminated choices (dual-write)
+  const saveEliminatedChoices = async (questionId, choiceIds) => {
+    // Block if user has account but is logged out
+    if (storage.hasUserAccount() && !isAuthenticated) {
+      console.warn('Cannot save eliminated choices: User has account but is not logged in');
+      return;
+    }
+
+    // Write to localStorage immediately
     storage.saveEliminatedChoices(questionId, choiceIds);
+
+    // Write to Supabase asynchronously (only for authenticated users)
+    if (isAuthenticated && user) {
+      try {
+        await supabaseData.saveEliminatedChoicesToSupabase(user.id, questionId, choiceIds);
+      } catch (error) {
+        console.error('Failed to sync eliminated choices to Supabase:', error);
+      }
+    }
   };
 
   // Get eliminated choices
@@ -51,6 +211,12 @@ export function UserDataProvider({ children }) {
     // Data
     stats,
     bookmarks,
+    syncStatus,
+    lastSyncTime,
+
+    // Login prompt state
+    showLoginPrompt,
+    setShowLoginPrompt,
 
     // Actions
     saveAnswer,
@@ -63,6 +229,10 @@ export function UserDataProvider({ children }) {
     getStatsBySubject: storage.getStatsBySubject,
     getStatsBySkill: storage.getStatsBySkill,
     getAllAnsweredQuestions: storage.getAllAnsweredQuestions,
+
+    // Sync functions
+    syncToSupabase,
+    loadFromSupabase,
 
     // Utilities
     refresh,
@@ -80,6 +250,10 @@ export function UserDataProvider({ children }) {
   return (
     <UserDataContext.Provider value={value}>
       {children}
+      <LoginModal
+        isOpen={showLoginPrompt}
+        onClose={() => setShowLoginPrompt(false)}
+      />
     </UserDataContext.Provider>
   );
 }
