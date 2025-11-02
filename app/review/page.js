@@ -51,7 +51,7 @@ export default function ReviewPage() {
     .filter(([, history]) => history.lastCorrect)
     .map(([id]) => id);
   const correctWithPriorIncorrectIds = Object.entries(answeredQuestions)
-    .filter(([, history]) => history.lastCorrect && history.attempts > 1)
+    .filter(([, history]) => history.lastCorrect && history.attempts.length > 1)
     .map(([id]) => id);
 
   // Filter questions based on selection

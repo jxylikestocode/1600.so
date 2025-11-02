@@ -1196,7 +1196,7 @@ export function QuestionViewer({
                     if (questionHistory) {
                       if (questionHistory.lastCorrect) {
                         // Correct answer
-                        if (questionHistory.attempts > 1) {
+                        if (questionHistory.attempts.length > 1) {
                           // Correct with prior incorrect attempts
                           borderClass = "border-2 border-green-500";
                           bgClass = "bg-red-500";
