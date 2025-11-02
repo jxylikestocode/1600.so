@@ -166,9 +166,10 @@ export function QuestionViewer({
       // Format 1: Reading & Writing - keys array contains correct answer IDs
       return question.detail.keys;
     }
-    if (Array.isArray(question.detail) && question.detail[0]?.answer?.correct) {
-      // Format 2: Math - correct field contains the correct answer key
-      return [question.detail[0].answer.correct];
+    if (Array.isArray(question.detail) && question.detail[0]?.answer) {
+      // Format 2: Math - correct_choice or correct field contains the correct answer key
+      const correctAnswer = question.detail[0].answer.correct_choice || question.detail[0].answer.correct;
+      return correctAnswer ? [correctAnswer] : [];
     }
     return [];
   };
