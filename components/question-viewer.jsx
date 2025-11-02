@@ -1297,7 +1297,10 @@ export function QuestionViewer({
 
                 {/* Go to Review Page Button */}
                 <div className="flex justify-center pt-2">
-                  <button className="px-6 py-2 border-2 border-blue-600 text-blue-600 rounded-full font-semibold hover:bg-blue-50 transition-colors">
+                  <button
+                    onClick={() => router.push('/review')}
+                    className="px-6 py-2 border-2 border-blue-600 text-blue-600 rounded-full font-semibold hover:bg-blue-50 transition-colors"
+                  >
                     Go to Review Page
                   </button>
                 </div>
