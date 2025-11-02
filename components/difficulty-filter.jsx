@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Gauge } from "lucide-react";
 import { useFilters } from "@/contexts/filter-context";
+import { trackFilter } from "@/lib/analytics";
 
 /**
  * DifficultyFilter Component
@@ -47,8 +48,10 @@ export function DifficultyFilter() {
     // If all 7 bands are selected, switch to "All"
     if (newBands.length === 7) {
       setSelectedBands([]);
+      trackFilter('difficulty_band', 'all');
     } else {
       setSelectedBands(newBands);
+      trackFilter('difficulty_band', newBands.join(','));
     }
   };
 
@@ -67,18 +70,30 @@ export function DifficultyFilter() {
     const allSelected = bands.every((b) => selectedBands.includes(b));
 
     let newBands;
+    let difficultyLevel;
+
+    if (JSON.stringify(bands) === JSON.stringify([1, 2, 3])) {
+      difficultyLevel = 'easy';
+    } else if (JSON.stringify(bands) === JSON.stringify([4, 5])) {
+      difficultyLevel = 'medium';
+    } else if (JSON.stringify(bands) === JSON.stringify([6, 7])) {
+      difficultyLevel = 'hard';
+    }
 
     if (allSelected) {
       // Deselect all these bands
       newBands = selectedBands.filter((b) => !bands.includes(b));
+      trackFilter('difficulty', `deselect_${difficultyLevel}`);
     } else {
       // Add all these bands (remove duplicates)
       newBands = [...new Set([...selectedBands, ...bands])];
+      trackFilter('difficulty', difficultyLevel);
     }
 
     // If all 7 bands are selected, switch to "All"
     if (newBands.length === 7) {
       setSelectedBands([]);
+      trackFilter('difficulty', 'all');
     } else {
       setSelectedBands(newBands);
     }
@@ -143,7 +158,10 @@ export function DifficultyFilter() {
         <Button
           variant={isSelected("all") ? "default" : "outline"}
           size="sm"
-          onClick={() => setSelectedBands([])}
+          onClick={() => {
+            setSelectedBands([]);
+            trackFilter('difficulty', 'all');
+          }}
         >
           All
         </Button>

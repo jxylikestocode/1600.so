@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
+import { storeBatchEvents, upsertUserSession } from '@/lib/analytics-db';
 
 /**
  * Analytics API Endpoint
  *
  * Receives batched analytics events from clients
- * Stores aggregated stats in Upstash Redis (or falls back to in-memory)
+ * Stores in Supabase database for persistence
+ * Also stores aggregated stats in Upstash Redis (or falls back to in-memory)
  */
 
 // Fallback in-memory store if Redis not configured
@@ -39,7 +41,38 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invalid events array' }, { status: 400 });
     }
 
-    // Process each event
+    // Store events in database for persistence
+    const dbEvents = events.map(event => ({
+      userId: event.userId,
+      sessionId: event.sessionId,
+      eventType: event.type,
+      eventData: { ...event, type: undefined, userId: undefined, sessionId: undefined, pagePath: undefined },
+      pagePath: event.pagePath,
+    }));
+
+    // Store in database (don't wait, fire and forget)
+    storeBatchEvents(dbEvents).catch(error => {
+      console.error('Failed to store events in database:', error);
+    });
+
+    // Update session info if we have device info
+    if (events.length > 0 && events[0].userAgent) {
+      const firstEvent = events[0];
+      upsertUserSession({
+        userId: firstEvent.userId,
+        sessionId: firstEvent.sessionId,
+        deviceInfo: {
+          userAgent: firstEvent.userAgent,
+          viewport: firstEvent.viewport,
+          screen: firstEvent.screen,
+          language: firstEvent.language,
+        },
+      }).catch(error => {
+        console.error('Failed to update session:', error);
+      });
+    }
+
+    // Process each event for Redis/memory aggregation
     for (const event of events) {
       await processEvent(event);
     }

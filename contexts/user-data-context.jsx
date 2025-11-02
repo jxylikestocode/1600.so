@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import * as supabaseData from '@/lib/supabase-data';
 import { performFullMigration, hasUserMigratedData, migrateTempUserToAuth } from '@/lib/migration';
 import { LoginModal } from '@/components/auth/login-modal';
+import { updateUserId, trackAuth } from '@/lib/analytics';
 
 const UserDataContext = createContext(null);
 
@@ -41,6 +42,10 @@ export function UserDataProvider({ children }) {
   // Sync with Supabase when user logs in
   useEffect(() => {
     if (isAuthenticated && user) {
+      // Update analytics user ID to link anonymous activity
+      updateUserId(user.id);
+      trackAuth('login', user.app_metadata?.provider || 'google');
+
       loadFromSupabase(user.id);
     }
   }, [isAuthenticated, user]);
