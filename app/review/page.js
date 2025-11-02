@@ -239,7 +239,7 @@ export default function ReviewPage() {
               Start Practicing
             </Button>
           </Card>
-        ) : filteredQuestions.length === 0 ? (
+        ) : totalCount === 0 ? (
           // No results for current filter
           <Card className="p-12 text-center">
             <div className="text-6xl mb-4">🔍</div>
