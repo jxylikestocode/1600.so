@@ -143,11 +143,13 @@ math * {
   display: inline !important;
 }
 
+/* Fractions need special handling */
 mfrac {
   display: inline-flex !important;
   flex-direction: column !important;
   vertical-align: middle !important;
   text-align: center !important;
+  margin: 0 0.15em !important;
 }
 
 mfrac > * {
@@ -161,6 +163,11 @@ mfrac > *:first-child {
 
 mfrac > *:last-child {
   padding-top: 0.1em !important;
+}
+
+/* Wrapped fractions (fraction of fractions) */
+mfrac mfrac {
+  font-size: 0.8em !important;
 }
 
 /* Question preview specific styles */
