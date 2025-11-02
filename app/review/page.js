@@ -14,15 +14,17 @@ export default function ReviewPage() {
   const [paginatedQuestions, setPaginatedQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // 'all', 'bookmarked', 'incorrect', 'correct', 'correct-with-prior-incorrect'
+  const [subjectFilter, setSubjectFilter] = useState('all'); // 'all', 'math', 'reading-writing'
+  const [skillFilter, setSkillFilter] = useState('all'); // 'all' or specific skill name
   const [currentPage, setCurrentPage] = useState(1);
   const [filteredQuestionIds, setFilteredQuestionIds] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const questionsPerPage = 10;
 
-  // Reset to page 1 when filter changes
+  // Reset to page 1 when any filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [filter]);
+  }, [filter, subjectFilter, skillFilter]);
 
   // Load only the questions for the current page
   useEffect(() => {
@@ -61,6 +63,29 @@ export default function ReviewPage() {
             idsToShow = allReviewedIds;
         }
 
+        // Apply subject filter
+        if (subjectFilter !== 'all') {
+          idsToShow = idsToShow.filter(id => {
+            const history = answeredQuestions[id];
+            if (!history) {
+              // For bookmarked questions that haven't been answered yet,
+              // we'll need to fetch them to know their subject
+              // For now, keep them in the list
+              return true;
+            }
+            return history.subject === subjectFilter;
+          });
+        }
+
+        // Apply skill filter
+        if (skillFilter !== 'all') {
+          idsToShow = idsToShow.filter(id => {
+            const history = answeredQuestions[id];
+            if (!history) return true; // Keep bookmarked unanswered questions
+            return history.skill_desc === skillFilter;
+          });
+        }
+
         setFilteredQuestionIds(idsToShow);
         setTotalCount(idsToShow.length);
 
@@ -94,7 +119,7 @@ export default function ReviewPage() {
     }
 
     loadPageQuestions();
-  }, [userData, currentPage, filter]);
+  }, [userData, currentPage, filter, subjectFilter, skillFilter]);
 
   if (loading) {
     return (
@@ -147,6 +172,17 @@ export default function ReviewPage() {
 
   // Calculate unique count for "All" filter
   const allReviewedCount = new Set([...bookmarkedIds, ...Object.keys(answeredQuestions)]).size;
+
+  // Get unique skills from answered questions
+  const uniqueSkills = [...new Set(
+    Object.values(answeredQuestions)
+      .map(history => history.skill_desc)
+      .filter(Boolean)
+  )].sort();
+
+  // Get subject counts
+  const mathCount = Object.values(answeredQuestions).filter(h => h.subject === 'math').length;
+  const readingWritingCount = Object.values(answeredQuestions).filter(h => h.subject === 'reading-writing').length;
 
   // Pagination calculations
   const totalPages = Math.ceil(totalCount / questionsPerPage);
@@ -222,6 +258,66 @@ export default function ReviewPage() {
               Correct (with prior incorrect) ({correctWithPriorIncorrectIds.length})
             </Button>
           </div>
+
+          {/* Subject Filter */}
+          {hasAnyProgress && (mathCount > 0 || readingWritingCount > 0) && (
+            <div className="mt-4">
+              <div className="text-sm font-medium text-gray-700 mb-2">Filter by Subject:</div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={subjectFilter === 'all' ? 'default' : 'outline'}
+                  onClick={() => setSubjectFilter('all')}
+                  size="sm"
+                >
+                  All Subjects
+                </Button>
+                {mathCount > 0 && (
+                  <Button
+                    variant={subjectFilter === 'math' ? 'default' : 'outline'}
+                    onClick={() => setSubjectFilter('math')}
+                    size="sm"
+                  >
+                    Math ({mathCount})
+                  </Button>
+                )}
+                {readingWritingCount > 0 && (
+                  <Button
+                    variant={subjectFilter === 'reading-writing' ? 'default' : 'outline'}
+                    onClick={() => setSubjectFilter('reading-writing')}
+                    size="sm"
+                  >
+                    Reading & Writing ({readingWritingCount})
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Skill Filter */}
+          {hasAnyProgress && uniqueSkills.length > 0 && (
+            <div className="mt-4">
+              <div className="text-sm font-medium text-gray-700 mb-2">Filter by Skill:</div>
+              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                <Button
+                  variant={skillFilter === 'all' ? 'default' : 'outline'}
+                  onClick={() => setSkillFilter('all')}
+                  size="sm"
+                >
+                  All Skills
+                </Button>
+                {uniqueSkills.map(skill => (
+                  <Button
+                    key={skill}
+                    variant={skillFilter === skill ? 'default' : 'outline'}
+                    onClick={() => setSkillFilter(skill)}
+                    size="sm"
+                  >
+                    {skill}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
