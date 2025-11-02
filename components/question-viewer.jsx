@@ -1044,7 +1044,7 @@ export function QuestionViewer({
               </Button>
             </PopoverTrigger>
             <PopoverContent
-              className="w-[600px] max-h-[500px] overflow-y-auto"
+              className="w-[calc(100vw-2rem)] md:w-[600px] max-h-[500px] overflow-y-auto"
               side="top"
               align="start"
             >
@@ -1081,7 +1081,7 @@ export function QuestionViewer({
               </button>
             </PopoverTrigger>
             <PopoverContent
-              className="w-[800px] max-h-[600px] overflow-y-auto"
+              className="w-[calc(100vw-2rem)] md:w-[800px] max-h-[600px] overflow-y-auto"
               side="top"
               align="center"
             >
