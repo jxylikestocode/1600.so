@@ -719,7 +719,7 @@ export function QuestionViewer({
               <div className="p-8">
                 {/* Question Stem (Text) */}
                 <div
-                  className="mb-6 text-base leading-relaxed text-gray-900 [&_*]:!inline [&_img]:align-middle"
+                  className="mb-6 text-base leading-relaxed text-gray-900 [&_img]:align-middle"
                   dangerouslySetInnerHTML={{
                     __html: Array.isArray(question.detail)
                       ? question.detail[0]?.prompt
