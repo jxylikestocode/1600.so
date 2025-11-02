@@ -414,23 +414,24 @@ export function QuestionViewer({
       <div className="bg-white border-b px-6 py-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between">
-            {/* Logo or Back to Review */}
-            {isReviewMode ? (
-              <button
-                onClick={() => router.push('/review')}
-                className="flex items-center gap-2 text-gray-900 hover:text-gray-700 transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-                <span className="text-lg font-semibold">Back to Review</span>
-              </button>
-            ) : (
+            {/* Logo */}
+            <div className="flex items-center gap-4">
               <button
                 onClick={handleBackToHome}
-                className="text-2xl font-bold text-gray-900 hover:text-gray-700 transition-colors"
+                className="text-2xl font-bold text-gray-900 hover:text-blue-600 transition-colors"
               >
                 1600.so
               </button>
-            )}
+              {isReviewMode && (
+                <button
+                  onClick={() => router.push('/review')}
+                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors text-sm"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back to Review</span>
+                </button>
+              )}
+            </div>
 
             {/* Timer, Calculator, Reference, More - Top Right */}
             <div className="flex items-center gap-4">
