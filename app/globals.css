@@ -120,9 +120,14 @@
     @apply bg-background text-foreground;
   }
 
+  /* Center figures (tables, images, etc) in questions */
+  figure {
+    @apply mx-auto my-4;
+  }
+
   /* Table styles for question previews */
   table {
-    @apply border-collapse border border-gray-300 my-2;
+    @apply border-collapse border border-gray-300 my-2 mx-auto;
   }
 
   td, th {
