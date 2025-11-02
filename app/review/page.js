@@ -17,11 +17,27 @@ export default function ReviewPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const questionsPerPage = 10;
 
-  // Load all questions
+  // Load only the questions the user has interacted with
   useEffect(() => {
     async function loadQuestions() {
       try {
-        const response = await fetch('/api/questions');
+        // Get all question IDs the user has interacted with
+        const bookmarkedIds = userData.bookmarks || [];
+        const answeredQuestions = userData.getAllAnsweredQuestions();
+        const answeredIds = Object.keys(answeredQuestions);
+
+        // Combine all unique IDs
+        const allReviewedIds = [...new Set([...bookmarkedIds, ...answeredIds])];
+
+        // If no questions to review, just finish loading
+        if (allReviewedIds.length === 0) {
+          setAllQuestions([]);
+          setLoading(false);
+          return;
+        }
+
+        // Fetch only the questions we need
+        const response = await fetch(`/api/questions/batch?ids=${allReviewedIds.join(',')}`);
         if (!response.ok) throw new Error('Failed to load questions');
         const questions = await response.json();
         setAllQuestions(questions);
@@ -33,7 +49,7 @@ export default function ReviewPage() {
     }
 
     loadQuestions();
-  }, []);
+  }, [userData]);
 
   // Reset to page 1 when filter changes
   useEffect(() => {
