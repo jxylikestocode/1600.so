@@ -108,11 +108,14 @@ export function QuestionViewer({
 
   // Recalculate currentIndex and totalQuestions based on filtered questions
   const actualCurrentIndex = useMemo(() => {
+    if (!isReviewMode) {
+      return currentIndex; // Use server-provided value when not in review mode
+    }
     const index = actualFilteredQuestions.findIndex(q => q.questionId === question.questionId);
     return index === -1 ? 0 : index + 1;
-  }, [actualFilteredQuestions, question.questionId]);
+  }, [isReviewMode, currentIndex, actualFilteredQuestions, question.questionId]);
 
-  const actualTotalQuestions = actualFilteredQuestions.length;
+  const actualTotalQuestions = isReviewMode ? actualFilteredQuestions.length : totalQuestions;
 
   // Debug: Log the full question to console only once when question changes
   useEffect(() => {
