@@ -142,10 +142,84 @@
 /* MathML rendering fixes */
 math {
   display: inline !important;
+  vertical-align: middle !important;
+  line-height: 0 !important;
 }
 
 math * {
+  line-height: normal !important;
+}
+
+/* Container elements - remove whitespace */
+mrow, mfenced {
+  display: inline-block !important;
+  white-space: nowrap !important;
+}
+
+/* Content elements */
+mi, mn, mo, mtext {
   display: inline !important;
+  white-space: nowrap !important;
+}
+
+/* Superscripts */
+msup {
+  display: inline-block !important;
+  vertical-align: baseline !important;
+  white-space: nowrap !important;
+}
+
+msup > *:first-child {
+  display: inline !important;
+  vertical-align: baseline !important;
+}
+
+msup > *:last-child {
+  display: inline !important;
+  font-size: 0.7em !important;
+  vertical-align: super !important;
+}
+
+/* Subscripts */
+msub {
+  display: inline-block !important;
+  vertical-align: baseline !important;
+  white-space: nowrap !important;
+}
+
+msub > *:first-child {
+  display: inline !important;
+  vertical-align: baseline !important;
+}
+
+msub > *:last-child {
+  display: inline !important;
+  font-size: 0.7em !important;
+  vertical-align: sub !important;
+}
+
+/* Combined subscript and superscript */
+msubsup {
+  display: inline-block !important;
+  vertical-align: baseline !important;
+  white-space: nowrap !important;
+}
+
+msubsup > *:first-child {
+  display: inline !important;
+  vertical-align: baseline !important;
+}
+
+msubsup > *:nth-child(2) {
+  display: inline !important;
+  font-size: 0.7em !important;
+  vertical-align: super !important;
+}
+
+msubsup > *:last-child {
+  display: inline !important;
+  font-size: 0.7em !important;
+  vertical-align: sub !important;
 }
 
 /* Fractions need special handling */
@@ -155,6 +229,7 @@ mfrac {
   vertical-align: middle !important;
   text-align: center !important;
   margin: 0 0.15em !important;
+  font-size: 1rem !important; /* Reset font size for fractions */
 }
 
 mfrac > * {
@@ -173,6 +248,11 @@ mfrac > *:last-child {
 /* Wrapped fractions (fraction of fractions) */
 mfrac mfrac {
   font-size: 0.8em !important;
+}
+
+/* Restore font size for content in fractions */
+mfrac mi, mfrac mn, mfrac mo {
+  font-size: 1em !important;
 }
 
 /* Question preview specific styles */

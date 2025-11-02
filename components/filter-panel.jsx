@@ -30,7 +30,7 @@ import { useFilters } from "@/contexts/filter-context";
  * Each filter manages its own state independently
  * Later, we'll add a way to collect all filter values for querying
  */
-export function FilterPanel() {
+export function FilterPanel({ allQuestions }) {
   const { resetFilters } = useFilters();
 
   return (
@@ -40,14 +40,14 @@ export function FilterPanel() {
       </CardHeader> */}
 
       <CardContent className="space-y-4">
-        {/* All filters on the same row */}
-        <div className="flex items-start gap-4 flex-wrap">
-          {/* <ActiveQuestionsFilter /> */}
-          {/* <ReleasedFilter /> */}
-          {/* <ProgramFilter /> */}
-          <DifficultyFilter />
-          {/* <StatusFilters /> */}
-        </div>
+        {/* Difficulty filter */}
+        <DifficultyFilter />
+
+        {/* Other filters (commented out) */}
+        {/* <ActiveQuestionsFilter /> */}
+        {/* <ReleasedFilter /> */}
+        {/* <ProgramFilter /> */}
+        {/* <StatusFilters /> */}
 
         {/* Reset button at bottom right */}
         <div className="flex justify-end">

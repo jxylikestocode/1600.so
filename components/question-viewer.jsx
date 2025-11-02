@@ -26,6 +26,7 @@ import {
   MapPin,
   ArrowLeft,
   Check,
+  RotateCcw,
 } from "lucide-react";
 import { DesmosCalculator } from "@/components/desmos-calculator";
 import { ReferenceSheet } from "@/components/reference-sheet";
@@ -44,6 +45,7 @@ export function QuestionViewer({
   prevQuestionId,
   nextQuestionId,
   skill,
+  domain,
   subject,
   selectedBands,
   allFilteredQuestions,
@@ -70,6 +72,21 @@ export function QuestionViewer({
   const [eliminatedChoices, setEliminatedChoices] = useState([]);
   const [eliminationHistory, setEliminationHistory] = useState([]);
   const [questionHistory, setQuestionHistory] = useState(null);
+  // Generate a unique key for this question set based on filters
+  const shuffleKey = useMemo(() => {
+    if (isReviewMode) {
+      return `shuffle_review_${reviewFilter}`;
+    }
+    const parts = ['shuffle'];
+    if (subject) parts.push(subject);
+    if (domain) parts.push(domain);
+    if (skill) parts.push(skill);
+    if (selectedBands?.length) parts.push(selectedBands.join('-'));
+    return parts.join('_');
+  }, [isReviewMode, reviewFilter, subject, domain, skill, selectedBands]);
+
+  const [isShuffled, setIsShuffled] = useState(false);
+  const [shuffledQuestions, setShuffledQuestions] = useState(null);
 
   // Filter questions based on review filter if in review mode
   const actualFilteredQuestions = useMemo(() => {
@@ -116,6 +133,39 @@ export function QuestionViewer({
   }, [isReviewMode, currentIndex, actualFilteredQuestions, question.questionId]);
 
   const actualTotalQuestions = isReviewMode ? actualFilteredQuestions.length : totalQuestions;
+
+  // Use shuffled questions if shuffle is active, otherwise use normal order
+  const displayQuestions = isShuffled && shuffledQuestions ? shuffledQuestions : actualFilteredQuestions;
+
+  // Calculate the display index based on shuffled order if active
+  const displayIndex = useMemo(() => {
+    const index = displayQuestions.findIndex(q => q.questionId === question.questionId);
+    return index === -1 ? actualCurrentIndex : index + 1;
+  }, [displayQuestions, question.questionId, actualCurrentIndex]);
+
+  // Load shuffle state from sessionStorage on mount
+  useEffect(() => {
+    try {
+      const savedShuffleState = sessionStorage.getItem(shuffleKey);
+      if (savedShuffleState) {
+        const { isShuffled: savedIsShuffled, questionIds } = JSON.parse(savedShuffleState);
+        if (savedIsShuffled && questionIds) {
+          // Reconstruct shuffled questions array from IDs
+          const shuffled = questionIds
+            .map(id => actualFilteredQuestions.find(q => q.questionId === id))
+            .filter(q => q !== undefined);
+
+          // Only use saved shuffle if all questions are found
+          if (shuffled.length === actualFilteredQuestions.length) {
+            setShuffledQuestions(shuffled);
+            setIsShuffled(true);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading shuffle state:', error);
+    }
+  }, [shuffleKey, actualFilteredQuestions]);
 
   // Debug: Log the full question to console only once when question changes
   useEffect(() => {
@@ -314,6 +364,49 @@ export function QuestionViewer({
     }
   };
 
+  // Shuffle questions using Fisher-Yates algorithm
+  const handleShuffleQuestions = () => {
+    // Always shuffle from the original order, not from already shuffled
+    const questionsToShuffle = [...actualFilteredQuestions];
+
+    // Fisher-Yates shuffle
+    for (let i = questionsToShuffle.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [questionsToShuffle[i], questionsToShuffle[j]] = [questionsToShuffle[j], questionsToShuffle[i]];
+    }
+
+    setShuffledQuestions(questionsToShuffle);
+    setIsShuffled(true);
+
+    // Save to sessionStorage
+    try {
+      const questionIds = questionsToShuffle.map(q => q.questionId);
+      sessionStorage.setItem(shuffleKey, JSON.stringify({
+        isShuffled: true,
+        questionIds
+      }));
+    } catch (error) {
+      console.error('Error saving shuffle state:', error);
+    }
+
+    trackFeature('shuffle_questions');
+  };
+
+  // Reset to original question order
+  const handleResetOrder = () => {
+    setShuffledQuestions(null);
+    setIsShuffled(false);
+
+    // Clear from sessionStorage
+    try {
+      sessionStorage.removeItem(shuffleKey);
+    } catch (error) {
+      console.error('Error clearing shuffle state:', error);
+    }
+
+    trackFeature('reset_question_order');
+  };
+
   const buildQuestionUrl = (questionId) => {
     if (isReviewMode) {
       // If in review mode, preserve the review filter
@@ -325,6 +418,7 @@ export function QuestionViewer({
     }
 
     if (skill && subject) {
+      // Filter by specific skill
       const params = new URLSearchParams({
         skill: skill,
         subject: subject,
@@ -336,19 +430,53 @@ export function QuestionViewer({
       }
 
       return `/question/${questionId}?${params.toString()}`;
+    } else if (domain && subject) {
+      // Filter by domain (category)
+      const params = new URLSearchParams({
+        domain: domain,
+        subject: subject,
+      });
+
+      // Add selected bands to URL if any are selected
+      if (selectedBands && selectedBands.length > 0) {
+        params.set("bands", selectedBands.join(","));
+      }
+
+      return `/question/${questionId}?${params.toString()}`;
+    } else if (subject) {
+      // Filter by subject only
+      const params = new URLSearchParams({
+        subject: subject,
+      });
+
+      // Add selected bands to URL if any are selected
+      if (selectedBands && selectedBands.length > 0) {
+        params.set("bands", selectedBands.join(","));
+      }
+
+      return `/question/${questionId}?${params.toString()}`;
     }
+
     return `/question/${questionId}`;
   };
 
   const handlePrev = () => {
-    if (prevQuestionId) {
-      router.push(buildQuestionUrl(prevQuestionId));
+    // Find current question index in display order
+    const currentIdx = displayQuestions.findIndex(q => q.questionId === question.questionId);
+
+    if (currentIdx > 0) {
+      const prevQuestion = displayQuestions[currentIdx - 1];
+      router.push(buildQuestionUrl(prevQuestion.questionId));
     }
   };
 
   const handleNext = () => {
-    if (nextQuestionId) {
-      router.push(buildQuestionUrl(nextQuestionId));
+    // Find current question index in display order
+    const currentIdx = displayQuestions.findIndex(q => q.questionId === question.questionId);
+
+    if (currentIdx < displayQuestions.length - 1) {
+      const nextQuestion = displayQuestions[currentIdx + 1];
+      router.push(buildQuestionUrl(nextQuestion.questionId));
     }
   };
 
@@ -367,7 +495,7 @@ export function QuestionViewer({
     }
 
     // Get the question at that index (questionNum - 1 because index is 0-based)
-    const targetQuestion = actualFilteredQuestions[questionNum - 1];
+    const targetQuestion = displayQuestions[questionNum - 1];
     if (targetQuestion) {
       router.push(buildQuestionUrl(targetQuestion.questionId));
       setJumpToInput(""); // Clear input after navigation
@@ -538,7 +666,7 @@ export function QuestionViewer({
               <div className="flex items-center gap-3">
                 {/* Question Number Badge */}
                 <Badge className="bg-gray-800 text-white px-4 py-2 text-base font-semibold">
-                  {currentIndex}
+                  {displayIndex}
                 </Badge>
 
                 {/* Previous Attempt Indicator */}
@@ -1129,8 +1257,8 @@ export function QuestionViewer({
           <Popover open={showNavigation} onOpenChange={setShowNavigation}>
             <PopoverTrigger asChild>
               <button className="px-2 md:px-4 py-2 mx-1 md:mx-3 bg-gray-900 text-white rounded text-sm font-semibold hover:bg-gray-800 transition-colors flex items-center gap-1 md:gap-2 whitespace-nowrap shrink-0">
-                <span className="hidden md:inline">Question {actualCurrentIndex} of {actualTotalQuestions}</span>
-                <span className="md:hidden text-xs">{actualCurrentIndex} of {actualTotalQuestions}</span>
+                <span className="hidden md:inline">Question {displayIndex} of {actualTotalQuestions}</span>
+                <span className="md:hidden text-xs">{displayIndex} of {actualTotalQuestions}</span>
                 {showNavigation ? (
                   <ChevronDown className="w-4 h-4 flex-shrink-0" />
                 ) : (
@@ -1146,15 +1274,28 @@ export function QuestionViewer({
               <div className="space-y-4">
                 {/* Header */}
                 <div className="flex items-center justify-between pb-3 border-b">
-                  {/* <h2 className="text-xl font-semibold">
-                    Section 1:{" "}
-                    {subject === "math"
-                      ? "Math"
-                      : subject === "reading-writing"
-                      ? "Reading and Writing"
-                      : "Unknown"}{" "}
-                    Questions
-                  </h2> */}
+                  <div className="flex items-center gap-2">
+                    {/* Shuffle button - always shown */}
+                    <button
+                      onClick={handleShuffleQuestions}
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                    >
+                      <Shuffle className="w-4 h-4" />
+                      <span>Shuffle Order</span>
+                    </button>
+
+                    {/* Reset button - shown when shuffled */}
+                    {isShuffled && (
+                      <button
+                        onClick={handleResetOrder}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        <span>Reset Order</span>
+                      </button>
+                    )}
+                  </div>
+
                   <button
                     onClick={() => setShowNavigation(false)}
                     className="p-1 hover:bg-gray-100 rounded transition-colors"
@@ -1205,47 +1346,47 @@ export function QuestionViewer({
                 </div>
 
                 {/* Legend */}
-                <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm border-b pb-4">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-5 h-5" />
+                <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs border-b pb-3">
+                  <div className="flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4" />
                     <span className="font-medium">Current</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded border-2 border-dashed border-gray-400"></div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-4 h-4 rounded border-2 border-dashed border-gray-400"></div>
                     <span className="font-medium">Unanswered</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded bg-green-500"></div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-4 h-4 rounded bg-green-500"></div>
                     <span className="font-medium">Correct</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded bg-red-500"></div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-4 h-4 rounded bg-red-500"></div>
                     <span className="font-medium">Incorrect</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded bg-red-500 border-2 border-green-500"></div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-4 h-4 rounded bg-red-500 border-2 border-green-500"></div>
                     <span className="font-medium">
                       Correct (with prior incorrect)
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Bookmark className="w-5 h-5 fill-yellow-500 text-yellow-500" />
+                  <div className="flex items-center gap-1.5">
+                    <Bookmark className="w-4 h-4 fill-yellow-500 text-yellow-500" />
                     <span className="font-medium">Marked for Review</span>
                   </div>
                 </div>
 
                 {/* Question Grid */}
-                <div className="flex flex-wrap gap-3 justify-center">
-                  {actualFilteredQuestions.map((q, idx) => {
+                <div className="flex flex-wrap gap-2.5 justify-center">
+                  {displayQuestions.map((q, idx) => {
                     const questionNum = idx + 1;
-                    const isCurrent = questionNum === currentIndex;
+                    const isCurrent = q.questionId === question.questionId;
 
                     // Get question status from userData
                     const questionHistory = userData.getQuestionHistory(q.questionId);
                     const isBookmarked = userData.isBookmarked(q.questionId);
 
                     // Determine styling based on status
-                    let buttonClass = "relative w-14 h-14 rounded font-semibold text-lg transition-all hover:bg-gray-50 ";
+                    let buttonClass = "relative w-12 h-12 rounded font-semibold text-base transition-all hover:bg-gray-50 ";
                     let borderClass = "";
                     let bgClass = "bg-white";
                     let textClass = "text-blue-600";

@@ -31,6 +31,49 @@ export function QuestionCountSummary({ allQuestions }) {
   const readingTotal = filteredQuestions.filter(q => q.subject === 'reading-writing').length;
 
   /**
+   * Handle clicking on a subject header - navigate to first question in that subject
+   */
+  const handleSubjectClick = (subject) => {
+    const subjectQuestions = filteredQuestions.filter(q => q.subject === subject);
+
+    if (subjectQuestions.length > 0) {
+      const firstQuestion = subjectQuestions[0];
+      const params = new URLSearchParams({ subject });
+
+      // Add selected bands to URL if any are selected
+      if (filters.selectedBands.length > 0) {
+        params.set('bands', filters.selectedBands.join(','));
+      }
+
+      router.push(`/question/${firstQuestion.questionId}?${params.toString()}`);
+    }
+  };
+
+  /**
+   * Handle clicking on a category - navigate to first question in that category
+   */
+  const handleCategoryClick = (category, subject) => {
+    const categoryQuestions = filteredQuestions.filter(
+      q => q.subject === subject && q.primary_class_cd_desc === category
+    );
+
+    if (categoryQuestions.length > 0) {
+      const firstQuestion = categoryQuestions[0];
+      const params = new URLSearchParams({
+        domain: category,
+        subject: subject,
+      });
+
+      // Add selected bands to URL if any are selected
+      if (filters.selectedBands.length > 0) {
+        params.set('bands', filters.selectedBands.join(','));
+      }
+
+      router.push(`/question/${firstQuestion.questionId}?${params.toString()}`);
+    }
+  };
+
+  /**
    * Handle clicking on a skill - navigate to first question in that skill
    */
   const handleSkillClick = (skillName, subject) => {
@@ -64,7 +107,10 @@ export function QuestionCountSummary({ allQuestions }) {
     return (
       <div className="mb-4">
         {/* Category Header */}
-        <div className="flex items-center gap-2 mb-2">
+        <div
+          className="flex items-center gap-2 mb-2 cursor-pointer hover:bg-gray-50 p-1 rounded transition-colors w-fit"
+          onClick={() => categoryTotal > 0 && handleCategoryClick(category, subject)}
+        >
           <Badge variant="outline" className="font-semibold">
             {category}
           </Badge>
@@ -103,11 +149,17 @@ export function QuestionCountSummary({ allQuestions }) {
       <div>
         {/* Subject Header */}
         <div className="flex items-center justify-between mb-4 pb-3 border-b-2">
-          <div className="flex items-center gap-2">
+          <div
+            className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity"
+            onClick={() => total > 0 && handleSubjectClick(subject)}
+          >
             <span className="text-2xl">{emoji}</span>
             <h3 className="text-lg font-bold">{title}</h3>
           </div>
-          <Badge className="bg-blue-600 hover:bg-blue-700 text-white">
+          <Badge
+            className="bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
+            onClick={() => total > 0 && handleSubjectClick(subject)}
+          >
             {total} questions
           </Badge>
         </div>

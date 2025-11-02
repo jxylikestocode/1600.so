@@ -32,6 +32,11 @@ export function FilterProvider({ children }) {
   const [solved, setSolved] = useState('all');
   const [answeredIncorrectly, setAnsweredIncorrectly] = useState('all');
 
+  // Hierarchical filters: Subject → Domain → Skill
+  const [selectedSubject, setSelectedSubject] = useState('all'); // 'all', 'math', 'reading-writing'
+  const [selectedDomain, setSelectedDomain] = useState('all'); // 'all' or domain name
+  const [selectedSkill, setSelectedSkill] = useState('all'); // 'all' or skill name
+
   /**
    * Reset all filters to default
    */
@@ -43,6 +48,9 @@ export function FilterProvider({ children }) {
     setMarkedForReview('all');
     setSolved('all');
     setAnsweredIncorrectly('all');
+    setSelectedSubject('all');
+    setSelectedDomain('all');
+    setSelectedSkill('all');
   };
 
   const value = {
@@ -54,6 +62,9 @@ export function FilterProvider({ children }) {
     markedForReview,
     solved,
     answeredIncorrectly,
+    selectedSubject,
+    selectedDomain,
+    selectedSkill,
 
     // Setters
     setActiveQuestions,
@@ -63,6 +74,9 @@ export function FilterProvider({ children }) {
     setMarkedForReview,
     setSolved,
     setAnsweredIncorrectly,
+    setSelectedSubject,
+    setSelectedDomain,
+    setSelectedSkill,
 
     // Actions
     resetFilters,

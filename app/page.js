@@ -52,7 +52,7 @@ export default async function Home() {
         {/* Wrap everything in FilterProvider so filters work */}
         <FilterProvider>
           {/* Filter Panel */}
-          <FilterPanel />
+          <FilterPanel allQuestions={allQuestions} />
 
           {/* Question Count Summary - now updates based on filters */}
           <QuestionCountSummary allQuestions={allQuestions} />

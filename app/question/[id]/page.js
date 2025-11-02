@@ -16,6 +16,7 @@ export default async function QuestionPage({ params, searchParams }) {
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
   const skill = resolvedSearchParams.skill;
+  const domain = resolvedSearchParams.domain;
   const subject = resolvedSearchParams.subject;
   const bandsParam = resolvedSearchParams.bands;
   const fromReview = resolvedSearchParams.from === 'review';
@@ -46,8 +47,19 @@ export default async function QuestionPage({ params, searchParams }) {
     // and let it handle the filtering
     filteredQuestions = allQuestions; // Will be filtered on client side
   } else if (skill && subject) {
+    // Filter by specific skill
     filteredQuestions = allQuestions.filter(
       (q) => q.subject === subject && q.skill_desc === skill
+    );
+  } else if (domain && subject) {
+    // Filter by domain (category)
+    filteredQuestions = allQuestions.filter(
+      (q) => q.subject === subject && q.primary_class_cd_desc === domain
+    );
+  } else if (subject) {
+    // Filter by subject only
+    filteredQuestions = allQuestions.filter(
+      (q) => q.subject === subject
     );
   }
 
@@ -79,6 +91,7 @@ export default async function QuestionPage({ params, searchParams }) {
       prevQuestionId={prevQuestion?.questionId}
       nextQuestionId={nextQuestion?.questionId}
       skill={skill}
+      domain={domain}
       subject={subject}
       selectedBands={selectedBands}
       allFilteredQuestions={filteredQuestions}

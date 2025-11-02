@@ -63,27 +63,57 @@ export default function ReviewPage() {
             idsToShow = allReviewedIds;
         }
 
-        // Apply subject filter
-        if (subjectFilter !== 'all') {
-          idsToShow = idsToShow.filter(id => {
+        // If subject or skill filters are active, we need to fetch questions to filter by their actual subject/skill
+        if (subjectFilter !== 'all' || skillFilter !== 'all') {
+          // First, filter by stored metadata for answered questions
+          const idsWithMetadata = idsToShow.filter(id => {
             const history = answeredQuestions[id];
-            if (!history) {
-              // For bookmarked questions that haven't been answered yet,
-              // we'll need to fetch them to know their subject
-              // For now, keep them in the list
-              return true;
-            }
-            return history.subject === subjectFilter;
-          });
-        }
+            if (!history) return false; // Will check these later by fetching
 
-        // Apply skill filter
-        if (skillFilter !== 'all') {
-          idsToShow = idsToShow.filter(id => {
-            const history = answeredQuestions[id];
-            if (!history) return true; // Keep bookmarked unanswered questions
-            return history.skill_desc === skillFilter;
+            // Check subject filter
+            if (subjectFilter !== 'all' && history.subject !== subjectFilter) {
+              return false;
+            }
+
+            // Check skill filter
+            if (skillFilter !== 'all' && history.skill_desc !== skillFilter) {
+              return false;
+            }
+
+            return true;
           });
+
+          // Get IDs without metadata (bookmarked but not answered)
+          const idsWithoutMetadata = idsToShow.filter(id => !answeredQuestions[id]);
+
+          // If there are IDs without metadata and filters are active, fetch them to check
+          if (idsWithoutMetadata.length > 0) {
+            const response = await fetch(`/api/questions/batch?ids=${idsWithoutMetadata.join(',')}`);
+            if (response.ok) {
+              const questions = await response.json();
+              const filteredNoMetadata = questions
+                .filter(q => {
+                  // Check subject filter
+                  if (subjectFilter !== 'all' && q.subject !== subjectFilter) {
+                    return false;
+                  }
+
+                  // Check skill filter
+                  if (skillFilter !== 'all' && q.skill_desc !== skillFilter) {
+                    return false;
+                  }
+
+                  return true;
+                })
+                .map(q => q.questionId);
+
+              idsToShow = [...idsWithMetadata, ...filteredNoMetadata];
+            } else {
+              idsToShow = idsWithMetadata;
+            }
+          } else {
+            idsToShow = idsWithMetadata;
+          }
         }
 
         setFilteredQuestionIds(idsToShow);
@@ -166,6 +196,18 @@ export default function ReviewPage() {
       break;
     default:
       filterTitle = 'All Reviewed Questions';
+  }
+
+  // Add subject and skill filters to title
+  if (subjectFilter !== 'all' || skillFilter !== 'all') {
+    const filterParts = [];
+    if (subjectFilter !== 'all') {
+      filterParts.push(subjectFilter === 'math' ? 'Math' : 'Reading & Writing');
+    }
+    if (skillFilter !== 'all') {
+      filterParts.push(skillFilter);
+    }
+    filterTitle = `${filterTitle} - ${filterParts.join(' - ')}`;
   }
 
   const hasAnyProgress = Object.keys(answeredQuestions).length > 0 || bookmarkedIds.length > 0;
