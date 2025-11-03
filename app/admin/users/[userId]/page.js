@@ -291,6 +291,10 @@ export default function UserJourneyPage() {
                           const naturalLanguage = formatEventAsNaturalLanguage(event, questionDetails);
                           const showTimeGap = event.timeGapSeconds && event.timeGapSeconds > 120; // Show gaps > 2 minutes
 
+                          // Extract question ID from answer events for linking
+                          const questionId = event.event_type === 'answer' ? event.event_data?.questionId : null;
+                          const questionIdShort = questionId?.substring(0, 8);
+
                           return (
                             <div key={event.id}>
                               {/* Time Gap Indicator */}
@@ -313,9 +317,24 @@ export default function UserJourneyPage() {
                                   {/* Content */}
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-start justify-between gap-4">
-                                      <p className="text-gray-900 font-medium leading-relaxed whitespace-pre-line">
-                                        {naturalLanguage}
-                                      </p>
+                                      <div className="text-gray-900 font-medium leading-relaxed whitespace-pre-line">
+                                        {questionId ? (
+                                          // For answer events, make question ID clickable
+                                          <>
+                                            {naturalLanguage.split(`#${questionIdShort}`)[0]}
+                                            <Link
+                                              href={`/question/${questionId}`}
+                                              className="text-blue-600 hover:text-blue-800 hover:underline"
+                                              target="_blank"
+                                            >
+                                              #{questionIdShort}
+                                            </Link>
+                                            {naturalLanguage.split(`#${questionIdShort}`)[1]}
+                                          </>
+                                        ) : (
+                                          naturalLanguage
+                                        )}
+                                      </div>
                                       <div className="flex-shrink-0 text-right">
                                         <p className="text-xs text-gray-500">
                                           {formatTime(event.created_at)}
