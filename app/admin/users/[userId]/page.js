@@ -3,16 +3,29 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import {
+  formatEventAsNaturalLanguage,
+  formatDateTime,
+  formatTime,
+  formatDuration,
+  formatTimeGap,
+  formatDeviceInfo,
+  extractPageFlow,
+  getEventIcon,
+} from '@/lib/journey-utils';
 
 export default function UserJourneyPage() {
   const params = useParams();
   const userId = params.userId;
 
-  const [events, setEvents] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [questionDetails, setQuestionDetails] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filterType, setFilterType] = useState('all'); // 'all', 'pageview', 'answer', 'filter', 'auth'
+  const [filterType, setFilterType] = useState('all');
   const [showRawData, setShowRawData] = useState(false);
+  const [collapsedSessions, setCollapsedSessions] = useState({});
+  const [pageFlow, setPageFlow] = useState({ flow: [], transitions: [] });
 
   useEffect(() => {
     if (userId) {
@@ -27,7 +40,14 @@ export default function UserJourneyPage() {
       const data = await response.json();
 
       if (response.ok) {
-        setEvents(data.events || []);
+        setSessions(data.sessions || []);
+        setQuestionDetails(data.questionDetails || {});
+
+        // Extract page flow from all events
+        if (data.events && data.events.length > 0) {
+          const flow = extractPageFlow(data.events);
+          setPageFlow(flow);
+        }
       } else {
         setError(data.error || 'Failed to fetch user journey');
       }
@@ -39,121 +59,50 @@ export default function UserJourneyPage() {
     }
   };
 
-  const filteredEvents = filterType === 'all'
-    ? events
-    : events.filter(e => e.event_type === filterType);
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
+  const toggleSession = (sessionId) => {
+    setCollapsedSessions(prev => ({
+      ...prev,
+      [sessionId]: !prev[sessionId]
+    }));
   };
 
-  const getEventIcon = (type) => {
-    switch (type) {
-      case 'pageview': return '👁️';
-      case 'answer': return '✍️';
-      case 'filter': return '🔍';
-      case 'auth': return '🔐';
-      case 'navigation': return '🧭';
-      case 'feature': return '⚡';
-      default: return '📝';
+  const getFilteredSessions = () => {
+    if (filterType === 'all') {
+      return sessions;
     }
+
+    return sessions.map(session => ({
+      ...session,
+      events: session.events.filter(e => e.event_type === filterType)
+    })).filter(session => session.events.length > 0);
+  };
+
+  const getTotalEvents = () => {
+    return sessions.reduce((sum, session) => sum + session.eventCount, 0);
   };
 
   const getEventColor = (type) => {
     switch (type) {
-      case 'pageview': return 'bg-blue-50 border-blue-200 text-blue-800';
-      case 'answer': return 'bg-green-50 border-green-200 text-green-800';
-      case 'filter': return 'bg-purple-50 border-purple-200 text-purple-800';
-      case 'auth': return 'bg-orange-50 border-orange-200 text-orange-800';
-      case 'navigation': return 'bg-gray-50 border-gray-200 text-gray-800';
-      case 'feature': return 'bg-pink-50 border-pink-200 text-pink-800';
-      default: return 'bg-gray-50 border-gray-200 text-gray-800';
-    }
-  };
-
-  const renderEventDetails = (event) => {
-    const data = event.event_data || {};
-
-    switch (event.event_type) {
-      case 'pageview':
-        return (
-          <div>
-            <p className="font-medium">Viewed: {event.page_path}</p>
-          </div>
-        );
-
-      case 'answer':
-        return (
-          <div>
-            <p className="font-medium">Question: {data.questionId?.substring(0, 8) || 'Unknown'}</p>
-            <p className="text-sm">
-              Answered: <span className={data.correct ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
-                {data.selectedAnswer} {data.correct ? '✓' : '✗'}
-              </span>
-            </p>
-            {data.correct !== undefined && (
-              <p className="text-xs text-gray-500 mt-1">
-                Correct answer: {data.correctAnswer}
-              </p>
-            )}
-          </div>
-        );
-
-      case 'filter':
-        return (
-          <div>
-            <p className="font-medium">Changed filter: {data.filterType || 'Unknown'}</p>
-            <p className="text-sm">Value: {data.value || 'N/A'}</p>
-          </div>
-        );
-
-      case 'auth':
-        return (
-          <div>
-            <p className="font-medium">Auth action: {data.action || 'Unknown'}</p>
-            {data.provider && <p className="text-sm">Provider: {data.provider}</p>}
-          </div>
-        );
-
-      case 'navigation':
-        return (
-          <div>
-            <p className="font-medium">{data.action || 'Navigation'}</p>
-            {data.from && <p className="text-sm">From: {data.from}</p>}
-            {data.to && <p className="text-sm">To: {data.to}</p>}
-          </div>
-        );
-
-      default:
-        return (
-          <div>
-            <p className="font-medium">{event.event_type}</p>
-            {Object.keys(data).length > 0 && (
-              <pre className="text-xs mt-1 bg-gray-100 p-2 rounded overflow-x-auto">
-                {JSON.stringify(data, null, 2)}
-              </pre>
-            )}
-          </div>
-        );
+      case 'pageview': return 'border-l-blue-400';
+      case 'answer': return 'border-l-green-400';
+      case 'filter': return 'border-l-purple-400';
+      case 'auth': return 'border-l-orange-400';
+      case 'navigation': return 'border-l-gray-400';
+      case 'feature': return 'border-l-pink-400';
+      case 'bookmark': return 'border-l-yellow-400';
+      default: return 'border-l-gray-400';
     }
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-5xl mx-auto">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 rounded w-1/3 mb-8"></div>
             <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-24 bg-gray-200 rounded"></div>
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-48 bg-gray-200 rounded"></div>
               ))}
             </div>
           </div>
@@ -165,7 +114,7 @@ export default function UserJourneyPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-5xl mx-auto">
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <p className="text-red-800">Error: {error}</p>
           </div>
@@ -174,11 +123,14 @@ export default function UserJourneyPage() {
     );
   }
 
-  const eventTypes = ['all', ...new Set(events.map(e => e.event_type))];
+  const filteredSessions = getFilteredSessions();
+  const allEventTypes = sessions.length > 0
+    ? ['all', ...new Set(sessions.flatMap(s => s.events.map(e => e.event_type)))]
+    : ['all'];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <Link href="/admin/users" className="text-blue-600 hover:text-blue-800 text-sm mb-2 inline-block">
@@ -191,31 +143,61 @@ export default function UserJourneyPage() {
           <p className="text-sm text-gray-500 font-mono mt-1">{userId}</p>
         </div>
 
+        {/* Page Flow Visualization */}
+        {pageFlow.flow.length > 1 && (
+          <div className="mb-6 bg-white rounded-lg p-6 shadow-sm">
+            <h2 className="text-lg font-semibold mb-4">📍 Navigation Flow</h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              {pageFlow.flow.map((page, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <div className="px-3 py-1.5 bg-blue-100 text-blue-800 rounded-md text-sm font-medium">
+                    {page}
+                  </div>
+                  {index < pageFlow.flow.length - 1 && (
+                    <span className="text-gray-400">→</span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Most common transitions */}
+            {pageFlow.transitions.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <p className="text-sm font-semibold text-gray-600 mb-2">Most Common Transitions:</p>
+                <div className="space-y-1">
+                  {pageFlow.transitions.slice(0, 5).map((transition, index) => (
+                    <div key={index} className="flex items-center gap-2 text-sm">
+                      <span className="text-gray-700">{transition.path}</span>
+                      <span className="text-xs text-gray-500">({transition.count}×)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Filters */}
         <div className="mb-6 flex gap-2 flex-wrap items-center">
           <div className="flex gap-2 flex-wrap flex-1">
-            {eventTypes.map(type => (
+            {allEventTypes.map(type => (
               <button
                 key={type}
                 onClick={() => setFilterType(type)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   filterType === type
                     ? 'bg-blue-600 text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
                 }`}
               >
                 {type === 'all' ? 'All Events' : type}
-                <span className="ml-2 text-xs opacity-75">
-                  ({type === 'all' ? events.length : events.filter(e => e.event_type === type).length})
-                </span>
               </button>
             ))}
           </div>
 
-          {/* Raw Data Toggle */}
           <button
             onClick={() => setShowRawData(!showRawData)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
               showRawData
                 ? 'bg-gray-800 text-white'
                 : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
@@ -225,80 +207,156 @@ export default function UserJourneyPage() {
           </button>
         </div>
 
-        {/* Timeline */}
-        <div className="space-y-4">
-          {filteredEvents.length === 0 ? (
+        {/* Sessions Timeline */}
+        <div className="space-y-6">
+          {filteredSessions.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-lg">
               <p className="text-gray-500">No events found</p>
             </div>
           ) : (
-            filteredEvents.map((event, index) => (
-              <div
-                key={event.id}
-                className={`bg-white rounded-lg border-l-4 p-6 shadow-sm ${getEventColor(event.event_type)}`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-4 flex-1">
-                    <div className="text-2xl">{getEventIcon(event.event_type)}</div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="text-xs font-semibold uppercase tracking-wide">
-                          {event.event_type}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          #{event.sequence_number}
-                        </span>
+            filteredSessions.map((session, sessionIndex) => {
+              const isCollapsed = collapsedSessions[session.sessionId];
+              const sessionInfo = session.sessionInfo;
+
+              return (
+                <div key={session.sessionId} className="bg-white rounded-lg shadow-sm overflow-hidden">
+                  {/* Session Header */}
+                  <div
+                    className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border-b border-gray-200 cursor-pointer hover:from-blue-100 hover:to-indigo-100 transition-colors"
+                    onClick={() => toggleSession(session.sessionId)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-lg font-bold text-gray-900">
+                            📅 Session {sessionIndex + 1}
+                          </h3>
+                          <span className="text-sm text-gray-600">
+                            {formatDateTime(session.firstEvent)}
+                          </span>
+                        </div>
+
+                        <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600">
+                          {sessionInfo && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-medium">Device:</span>
+                              <span>{formatDeviceInfo(sessionInfo.device_info)}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium">Duration:</span>
+                            <span>{formatDuration(session.durationSeconds)}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium">Events:</span>
+                            <span>{session.eventCount}</span>
+                          </div>
+                        </div>
                       </div>
-                      {renderEventDetails(event)}
+
+                      <button className="text-gray-500 hover:text-gray-700 p-1">
+                        {isCollapsed ? (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                        )}
+                      </button>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-500">{formatDate(event.created_at)}</p>
-                    <p className="text-xs text-gray-400 mt-1 font-mono">
-                      {event.session_id?.substring(0, 15)}...
-                    </p>
-                  </div>
-                </div>
 
-                {/* Raw Data Section */}
-                {showRawData && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-xs font-semibold text-gray-600 mb-2">RAW EVENT DATA:</p>
-                    <pre className="text-xs bg-gray-900 text-green-400 p-3 rounded overflow-x-auto font-mono">
-                      {JSON.stringify(event, null, 2)}
-                    </pre>
-                  </div>
-                )}
-              </div>
-            ))
+                  {/* Session Events */}
+                  {!isCollapsed && (
+                    <div className="p-4">
+                      <div className="space-y-3">
+                        {session.events.map((event, eventIndex) => {
+                          const naturalLanguage = formatEventAsNaturalLanguage(event, questionDetails);
+                          const showTimeGap = event.timeGapSeconds && event.timeGapSeconds > 120; // Show gaps > 2 minutes
+
+                          return (
+                            <div key={event.id}>
+                              {/* Time Gap Indicator */}
+                              {showTimeGap && (
+                                <div className="flex items-center gap-2 py-2 text-xs text-gray-500">
+                                  <div className="flex-1 border-t border-dashed border-gray-300"></div>
+                                  <span className="px-2">⏱️ {formatTimeGap(event.timeGapSeconds)}</span>
+                                  <div className="flex-1 border-t border-dashed border-gray-300"></div>
+                                </div>
+                              )}
+
+                              {/* Event Card */}
+                              <div className={`border-l-4 ${getEventColor(event.event_type)} bg-gray-50 rounded-r-lg p-4`}>
+                                <div className="flex items-start gap-3">
+                                  {/* Icon */}
+                                  <div className="text-xl flex-shrink-0 mt-0.5">
+                                    {getEventIcon(event.event_type)}
+                                  </div>
+
+                                  {/* Content */}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-start justify-between gap-4">
+                                      <p className="text-gray-900 font-medium leading-relaxed whitespace-pre-line">
+                                        {naturalLanguage}
+                                      </p>
+                                      <div className="flex-shrink-0 text-right">
+                                        <p className="text-xs text-gray-500">
+                                          {formatTime(event.created_at)}
+                                        </p>
+                                        <p className="text-xs text-gray-400 mt-0.5">
+                                          #{event.sequence_number}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    {/* Raw Data */}
+                                    {showRawData && (
+                                      <div className="mt-3 pt-3 border-t border-gray-200">
+                                        <pre className="text-xs bg-gray-900 text-green-400 p-3 rounded overflow-x-auto font-mono">
+                                          {JSON.stringify(event, null, 2)}
+                                        </pre>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
 
         {/* Summary */}
-        {events.length > 0 && (
+        {sessions.length > 0 && (
           <div className="mt-8 bg-white rounded-lg p-6 shadow-sm">
-            <h2 className="text-lg font-semibold mb-4">Summary</h2>
+            <h2 className="text-lg font-semibold mb-4">📊 Summary</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <p className="text-sm text-gray-600">Total Events</p>
-                <p className="text-2xl font-bold">{events.length}</p>
+                <p className="text-2xl font-bold text-gray-900">{getTotalEvents()}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Sessions</p>
-                <p className="text-2xl font-bold">
-                  {new Set(events.map(e => e.session_id)).size}
-                </p>
+                <p className="text-sm text-gray-600">Total Sessions</p>
+                <p className="text-2xl font-bold text-gray-900">{sessions.length}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">First Activity</p>
-                <p className="text-sm font-medium">
-                  {formatDate(events[events.length - 1]?.created_at)}
+                <p className="text-sm font-medium text-gray-700">
+                  {formatDateTime(sessions[0]?.firstEvent)}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Last Activity</p>
-                <p className="text-sm font-medium">
-                  {formatDate(events[0]?.created_at)}
+                <p className="text-sm font-medium text-gray-700">
+                  {formatDateTime(sessions[sessions.length - 1]?.lastEvent)}
                 </p>
               </div>
             </div>
