@@ -7,7 +7,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [sortBy, setSortBy] = useState('last_activity'); // 'last_activity', 'total_events', 'answer_count'
+  const [sortBy, setSortBy] = useState('last_active'); // 'last_active', 'total_events', 'answer_count'
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc', 'desc'
 
   useEffect(() => {
@@ -38,10 +38,15 @@ export default function AdminUsersPage() {
     let bVal = b[sortBy];
 
     // Convert dates to timestamps for comparison
-    if (sortBy === 'last_activity' || sortBy === 'first_activity') {
+    if (sortBy === 'last_active' || sortBy === 'first_active') {
       aVal = new Date(aVal).getTime();
       bVal = new Date(bVal).getTime();
     }
+
+    // Handle null/undefined values (push to end)
+    if (aVal == null && bVal == null) return 0;
+    if (aVal == null) return 1;
+    if (bVal == null) return -1;
 
     if (sortOrder === 'asc') {
       return aVal > bVal ? 1 : -1;
@@ -121,7 +126,7 @@ export default function AdminUsersPage() {
           </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-white rounded-lg shadow overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -130,6 +135,18 @@ export default function AdminUsersPage() {
                   onClick={() => toggleSort('user_id')}
                 >
                   User ID <SortIcon field="user_id" />
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => toggleSort('username')}
+                >
+                  Username <SortIcon field="username" />
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => toggleSort('most_recent_location')}
+                >
+                  Most Recent Location <SortIcon field="most_recent_location" />
                 </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -157,9 +174,9 @@ export default function AdminUsersPage() {
                 </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                  onClick={() => toggleSort('last_activity')}
+                  onClick={() => toggleSort('last_active')}
                 >
-                  Last Active <SortIcon field="last_activity" />
+                  Last Active <SortIcon field="last_active" />
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
@@ -168,7 +185,11 @@ export default function AdminUsersPage() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {sortedUsers.map((user) => (
-                <tr key={user.user_id} className="hover:bg-gray-50">
+                <tr
+                  key={user.user_id}
+                  className="hover:bg-gray-50 cursor-pointer"
+                  onClick={() => window.location.href = `/admin/users/${encodeURIComponent(user.user_id)}`}
+                >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
                       {user.user_id.startsWith('anon_') ? (
@@ -184,6 +205,16 @@ export default function AdminUsersPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {user.username || 'Anonymous'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {user.most_recent_location ? (
+                      <span>📍 {user.most_recent_location}</span>
+                    ) : (
+                      <span className="text-gray-400 italic">No location data</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {user.total_events}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -196,7 +227,7 @@ export default function AdminUsersPage() {
                     {user.pageview_count}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatDate(user.last_activity)}
+                    {formatDate(user.last_active)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <Link
