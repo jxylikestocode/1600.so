@@ -41,6 +41,8 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invalid events array' }, { status: 400 });
     }
 
+    console.log(`[Analytics API] Received ${events.length} events, first event:`, JSON.stringify(events[0], null, 2));
+
     // Store events in database for persistence
     const dbEvents = events.map(event => ({
       userId: event.userId,
@@ -50,10 +52,20 @@ export async function POST(request) {
       pagePath: event.pagePath,
     }));
 
+    console.log(`[Analytics API] Transformed to dbEvents, first:`, JSON.stringify(dbEvents[0], null, 2));
+
     // Store in database (don't wait, fire and forget)
-    storeBatchEvents(dbEvents).catch(error => {
-      console.error('Failed to store events in database:', error);
-    });
+    storeBatchEvents(dbEvents)
+      .then(result => {
+        if (result.success) {
+          console.log(`Successfully stored ${result.data?.length || dbEvents.length} events`);
+        } else {
+          console.error('Failed to store events:', result.error);
+        }
+      })
+      .catch(error => {
+        console.error('Failed to store events in database:', error);
+      });
 
     // Update session info if we have device info
     if (events.length > 0 && events[0].userAgent) {
