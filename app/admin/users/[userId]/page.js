@@ -12,6 +12,7 @@ export default function UserJourneyPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filterType, setFilterType] = useState('all'); // 'all', 'pageview', 'answer', 'filter', 'auth'
+  const [showRawData, setShowRawData] = useState(false);
 
   useEffect(() => {
     if (userId) {
@@ -191,23 +192,37 @@ export default function UserJourneyPage() {
         </div>
 
         {/* Filters */}
-        <div className="mb-6 flex gap-2 flex-wrap">
-          {eventTypes.map(type => (
-            <button
-              key={type}
-              onClick={() => setFilterType(type)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filterType === type
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
-              }`}
-            >
-              {type === 'all' ? 'All Events' : type}
-              <span className="ml-2 text-xs opacity-75">
-                ({type === 'all' ? events.length : events.filter(e => e.event_type === type).length})
-              </span>
-            </button>
-          ))}
+        <div className="mb-6 flex gap-2 flex-wrap items-center">
+          <div className="flex gap-2 flex-wrap flex-1">
+            {eventTypes.map(type => (
+              <button
+                key={type}
+                onClick={() => setFilterType(type)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  filterType === type
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                }`}
+              >
+                {type === 'all' ? 'All Events' : type}
+                <span className="ml-2 text-xs opacity-75">
+                  ({type === 'all' ? events.length : events.filter(e => e.event_type === type).length})
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Raw Data Toggle */}
+          <button
+            onClick={() => setShowRawData(!showRawData)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              showRawData
+                ? 'bg-gray-800 text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+            }`}
+          >
+            {showRawData ? '📋 Hide Raw Data' : '📋 Show Raw Data'}
+          </button>
         </div>
 
         {/* Timeline */}
@@ -244,6 +259,16 @@ export default function UserJourneyPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* Raw Data Section */}
+                {showRawData && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <p className="text-xs font-semibold text-gray-600 mb-2">RAW EVENT DATA:</p>
+                    <pre className="text-xs bg-gray-900 text-green-400 p-3 rounded overflow-x-auto font-mono">
+                      {JSON.stringify(event, null, 2)}
+                    </pre>
+                  </div>
+                )}
               </div>
             ))
           )}

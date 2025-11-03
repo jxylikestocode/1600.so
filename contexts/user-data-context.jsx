@@ -42,9 +42,17 @@ export function UserDataProvider({ children }) {
   // Sync with Supabase when user logs in
   useEffect(() => {
     if (isAuthenticated && user) {
-      // Update analytics user ID to link anonymous activity
-      updateUserId(user.id);
-      trackAuth('login', user.app_metadata?.provider || 'google');
+      // Check if we've already tracked login for this session
+      const loginTracked = sessionStorage.getItem('analytics_login_tracked');
+
+      if (!loginTracked) {
+        // Update analytics user ID to link anonymous activity
+        updateUserId(user.id);
+        trackAuth('login', user.app_metadata?.provider || 'google');
+
+        // Mark as tracked for this session
+        sessionStorage.setItem('analytics_login_tracked', 'true');
+      }
 
       loadFromSupabase(user.id);
     }
