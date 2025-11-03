@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { useFilters } from '@/contexts/filter-context';
 import { applyFilters, getFilteredSkillBreakdown } from '@/lib/filter-utils';
 import { useRouter } from 'next/navigation';
+import { trackFilter } from '@/lib/analytics';
 
 /**
  * QuestionCountSummary Component
@@ -34,6 +35,7 @@ export function QuestionCountSummary({ allQuestions }) {
    * Handle clicking on a subject header - navigate to first question in that subject
    */
   const handleSubjectClick = (subject) => {
+    trackFilter('subject', subject);
     const subjectQuestions = filteredQuestions.filter(q => q.subject === subject);
 
     if (subjectQuestions.length > 0) {
@@ -53,6 +55,7 @@ export function QuestionCountSummary({ allQuestions }) {
    * Handle clicking on a category - navigate to first question in that category
    */
   const handleCategoryClick = (category, subject) => {
+    trackFilter('domain', category);
     const categoryQuestions = filteredQuestions.filter(
       q => q.subject === subject && q.primary_class_cd_desc === category
     );
@@ -77,6 +80,7 @@ export function QuestionCountSummary({ allQuestions }) {
    * Handle clicking on a skill - navigate to first question in that skill
    */
   const handleSkillClick = (skillName, subject) => {
+    trackFilter('skill', skillName);
     // Find questions matching this skill
     const skillQuestions = filteredQuestions.filter(
       q => q.subject === subject && q.skill_desc === skillName

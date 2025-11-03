@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { useFilters } from '@/contexts/filter-context';
 import { ChevronRight } from 'lucide-react';
+import { trackFilter } from '@/lib/analytics';
 
 /**
  * SubjectDomainSkillFilter Component
@@ -50,17 +51,20 @@ export function SubjectDomainSkillFilter({ allQuestions }) {
     : [];
 
   const handleSubjectChange = (subject) => {
+    trackFilter('subject', subject);
     setSelectedSubject(subject);
     setSelectedDomain('all'); // Reset domain when subject changes
     setSelectedSkill('all'); // Reset skill when subject changes
   };
 
   const handleDomainChange = (domain) => {
+    trackFilter('domain', domain);
     setSelectedDomain(domain);
     setSelectedSkill('all'); // Reset skill when domain changes
   };
 
   const handleSkillChange = (skill) => {
+    trackFilter('skill', skill);
     setSelectedSkill(skill);
   };
 
