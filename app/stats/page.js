@@ -16,6 +16,7 @@ export default function StatsPage() {
   const stats = userData.stats || { totalAnswered: 0, correctCount: 0, accuracy: 0, totalTimeSpent: 0, averageTimePerQuestion: 0, streakDays: 0 };
   const skillStats = userData.getStatsBySkill() || {};
   const subjectStats = userData.getStatsBySubject() || {};
+  const isLoading = userData.statsLoading;
 
   // Check if user has any progress
   const hasProgress = stats && stats.totalAnswered > 0;
@@ -57,7 +58,18 @@ export default function StatsPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {!hasProgress ? (
+        {isLoading ? (
+          // Loading State
+          <Card className="p-12 text-center">
+            <div className="text-6xl mb-4">⏳</div>
+            <div className="text-2xl font-bold text-gray-900 mb-2">
+              Loading Your Progress...
+            </div>
+            <div className="text-gray-600">
+              Fetching your stats from the database
+            </div>
+          </Card>
+        ) : !hasProgress ? (
           // Empty State
           <Card className="p-12 text-center">
             <div className="text-6xl mb-4">📊</div>

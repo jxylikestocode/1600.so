@@ -17,6 +17,9 @@ export function UserDataProvider({ children }) {
   const [syncStatus, setSyncStatus] = useState('idle'); // 'idle', 'syncing', 'synced', 'error'
   const [lastSyncTime, setLastSyncTime] = useState(null);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [subjectStats, setSubjectStats] = useState(null);
+  const [skillStats, setSkillStats] = useState(null);
 
   const { user, isAuthenticated } = useAuth();
 
@@ -34,10 +37,16 @@ export function UserDataProvider({ children }) {
   // Load initial data
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setStats(storage.getStats());
+      // For authenticated users, we'll fetch from database
+      // For anonymous users, use localStorage
+      if (!isAuthenticated) {
+        setStats(storage.getStats());
+        setSubjectStats(storage.getStatsBySubject());
+        setSkillStats(storage.getStatsBySkill());
+      }
       setBookmarks(storage.getBookmarks());
     }
-  }, [refreshTrigger]);
+  }, [refreshTrigger, isAuthenticated]);
 
   // Sync with Supabase when user logs in
   useEffect(() => {
@@ -55,12 +64,50 @@ export function UserDataProvider({ children }) {
       }
 
       loadFromSupabase(user.id);
+      fetchStatsFromDatabase(user.id);
     }
   }, [isAuthenticated, user]);
 
   // Force refresh of all data
   const refresh = () => {
     setRefreshTrigger(prev => prev + 1);
+
+    // Also refresh database stats for authenticated users
+    if (isAuthenticated && user) {
+      fetchStatsFromDatabase(user.id);
+    }
+  };
+
+  // Fetch stats from database for authenticated users
+  const fetchStatsFromDatabase = async (userId) => {
+    if (!userId) return;
+
+    try {
+      setStatsLoading(true);
+
+      const response = await fetch(`/api/stats?userId=${userId}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setStats(data.stats);
+        setSubjectStats(data.subjectStats);
+        setSkillStats(data.skillStats);
+      } else {
+        console.error('Failed to fetch stats from database:', data.error);
+        // Fallback to localStorage
+        setStats(storage.getStats());
+        setSubjectStats(storage.getStatsBySubject());
+        setSkillStats(storage.getStatsBySkill());
+      }
+    } catch (error) {
+      console.error('Error fetching stats from database:', error);
+      // Fallback to localStorage
+      setStats(storage.getStats());
+      setSubjectStats(storage.getStatsBySubject());
+      setSkillStats(storage.getStatsBySkill());
+    } finally {
+      setStatsLoading(false);
+    }
   };
 
   // Load data from Supabase and update localStorage
@@ -74,6 +121,8 @@ export function UserDataProvider({ children }) {
       // Check if user has already migrated
       const alreadyMigrated = await hasUserMigratedData(userId);
 
+      console.log('loadFromSupabase:', { userId, alreadyMigrated });
+
       if (!alreadyMigrated) {
         // Check for temp user data to migrate
         const tempUserId = localStorage.getItem('temp_user_id');
@@ -83,12 +132,18 @@ export function UserDataProvider({ children }) {
         } else {
           // Migrate localStorage data
           console.log('Migrating localStorage data to Supabase');
-          await performFullMigration(userId);
+          const migrationResult = await performFullMigration(userId);
+          console.log('Migration result:', migrationResult);
         }
       }
 
       // Fetch data from Supabase
       const result = await supabaseData.fetchUserDataFromSupabase(userId);
+      console.log('Fetched from Supabase:', {
+        success: result.success,
+        answerCount: result.data?.answers ? Object.keys(result.data.answers).length : 0,
+        bookmarkCount: result.data?.bookmarks?.length || 0,
+      });
 
       if (result.success && result.data) {
         // Only update localStorage if Supabase has actual data
@@ -101,11 +156,13 @@ export function UserDataProvider({ children }) {
         if (hasData) {
           console.log('Updating localStorage with Supabase data');
           storage.importData(result.data);
+          refresh(); // Refresh state to show the data
         } else {
           console.log('Supabase has no data yet, keeping localStorage data');
+          // IMPORTANT: Still refresh to ensure context uses current localStorage data
+          refresh();
         }
 
-        refresh();
         setSyncStatus('synced');
         setLastSyncTime(new Date());
       } else {
@@ -144,7 +201,6 @@ export function UserDataProvider({ children }) {
 
     // Write to localStorage immediately (always works, even offline)
     const result = storage.saveAnswer(questionId, answer, isCorrect, timeSpent, questionMeta);
-    refresh();
 
     // Write to Supabase asynchronously (only for authenticated users)
     if (isAuthenticated && user) {
@@ -157,10 +213,15 @@ export function UserDataProvider({ children }) {
           timeSpent,
           questionMeta
         );
+        // Refresh stats from database after saving
+        fetchStatsFromDatabase(user.id);
       } catch (error) {
         console.error('Failed to save answer to Supabase:', error);
         // Don't throw - we still have localStorage data
       }
+    } else {
+      // For anonymous users, refresh from localStorage
+      refresh();
     }
 
     return result;
@@ -226,6 +287,9 @@ export function UserDataProvider({ children }) {
     bookmarks,
     syncStatus,
     lastSyncTime,
+    statsLoading,
+    subjectStats,
+    skillStats,
 
     // Login prompt state
     showLoginPrompt,
@@ -239,13 +303,28 @@ export function UserDataProvider({ children }) {
     getQuestionHistory: storage.getQuestionHistory,
     isBookmarked: storage.isBookmarked,
     getIncorrectQuestionIds: storage.getIncorrectQuestionIds,
-    getStatsBySubject: storage.getStatsBySubject,
-    getStatsBySkill: storage.getStatsBySkill,
+    getStatsBySubject: () => {
+      // For authenticated users, use database stats
+      if (isAuthenticated && subjectStats) {
+        return subjectStats;
+      }
+      // For anonymous users, use localStorage
+      return storage.getStatsBySubject();
+    },
+    getStatsBySkill: () => {
+      // For authenticated users, use database stats
+      if (isAuthenticated && skillStats) {
+        return skillStats;
+      }
+      // For anonymous users, use localStorage
+      return storage.getStatsBySkill();
+    },
     getAllAnsweredQuestions: storage.getAllAnsweredQuestions,
 
     // Sync functions
     syncToSupabase,
     loadFromSupabase,
+    fetchStatsFromDatabase,
 
     // Utilities
     refresh,
