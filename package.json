@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "deploy:staging": "git push origin staging",
+    "deploy:production": "git push origin main"
   },
   "dependencies": {
     "@radix-ui/react-popover": "^1.1.15",

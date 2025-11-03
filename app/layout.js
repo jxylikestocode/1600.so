@@ -6,6 +6,7 @@ import { UserDataProvider } from "@/contexts/user-data-context";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { AnalyticsInit } from "@/components/analytics-init";
+import CommentFAB from "@/components/comment-fab";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,6 +37,7 @@ export default function RootLayout({ children }) {
       >
         <AnalyticsInit />
         <UserDataProvider>{children}</UserDataProvider>
+        <CommentFAB />
         <Analytics />
         <SpeedInsights />
       </body>

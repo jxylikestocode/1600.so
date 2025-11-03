@@ -21,6 +21,8 @@ export default function UserJourneyPage() {
 
   const [sessions, setSessions] = useState([]);
   const [questionDetails, setQuestionDetails] = useState({});
+  const [userEmail, setUserEmail] = useState(null);
+  const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filterType, setFilterType] = useState('all');
@@ -43,6 +45,8 @@ export default function UserJourneyPage() {
       if (response.ok) {
         setSessions(data.sessions || []);
         setQuestionDetails(data.questionDetails || {});
+        setUserEmail(data.userEmail || null);
+        setComments(data.comments || []);
 
         // Extract page flow from all events
         if (data.events && data.events.length > 0) {
@@ -144,6 +148,71 @@ export default function UserJourneyPage() {
           <p className="text-sm text-gray-500 font-mono mt-1">{userId}</p>
         </div>
 
+        {/* User Information Card */}
+        {sessions.length > 0 && (() => {
+          const mostRecentSession = sessions[sessions.length - 1];
+          const firstSession = sessions[0];
+          const deviceInfo = mostRecentSession?.sessionInfo?.device_info;
+          const location = deviceInfo?.location;
+
+          return (
+            <div className="mb-6 bg-white rounded-lg p-6 shadow-sm">
+              <h2 className="text-lg font-semibold mb-4">👤 User Information</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Email */}
+                {userEmail && (
+                  <div>
+                    <p className="text-sm text-gray-600 font-medium">Email</p>
+                    <p className="text-gray-900">{userEmail}</p>
+                  </div>
+                )}
+
+                {/* Device Info */}
+                {deviceInfo && (
+                  <div>
+                    <p className="text-sm text-gray-600 font-medium">Most Recent Device</p>
+                    <p className="text-gray-900">{formatDeviceInfo(deviceInfo)}</p>
+                  </div>
+                )}
+
+                {/* Location */}
+                {location && !location.isLocal && (
+                  <div>
+                    <p className="text-sm text-gray-600 font-medium">Location</p>
+                    <p className="text-gray-900">{formatLocation(location)}</p>
+                  </div>
+                )}
+
+                {/* IP Address */}
+                {deviceInfo?.ip && (
+                  <div>
+                    <p className="text-sm text-gray-600 font-medium">IP Address</p>
+                    <p className="text-gray-900 font-mono text-sm">{deviceInfo.ip}</p>
+                  </div>
+                )}
+
+                {/* Total Sessions */}
+                <div>
+                  <p className="text-sm text-gray-600 font-medium">Total Sessions</p>
+                  <p className="text-gray-900">{sessions.length}</p>
+                </div>
+
+                {/* First Activity */}
+                <div>
+                  <p className="text-sm text-gray-600 font-medium">First Activity</p>
+                  <p className="text-gray-900">{formatDateTime(firstSession.firstEvent)}</p>
+                </div>
+
+                {/* Last Activity */}
+                <div>
+                  <p className="text-sm text-gray-600 font-medium">Last Activity</p>
+                  <p className="text-gray-900">{formatDateTime(mostRecentSession.lastEvent)}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Page Flow Visualization */}
         {pageFlow.flow.length > 1 && (
           <div className="mb-6 bg-white rounded-lg p-6 shadow-sm">
@@ -175,6 +244,50 @@ export default function UserJourneyPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* User Comments */}
+        {comments.length > 0 && (
+          <div className="mb-6 bg-white rounded-lg p-6 shadow-sm">
+            <h2 className="text-lg font-semibold mb-4">💬 User Comments ({comments.length})</h2>
+            <div className="space-y-4">
+              {comments.map((comment) => (
+                <div key={comment.id} className="border-l-4 border-l-blue-500 bg-gray-50 rounded-r-lg p-4">
+                  <div className="flex items-start justify-between gap-4 mb-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-medium text-gray-600">Page:</span>
+                        <code className="text-xs bg-white px-2 py-0.5 rounded text-gray-800 border border-gray-200">
+                          {comment.page_path}
+                        </code>
+                        <Link
+                          href={comment.page_path}
+                          target="_blank"
+                          className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          Visit →
+                        </Link>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        {formatDateTime(comment.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-md p-3 border border-gray-200">
+                    <p className="text-gray-900 whitespace-pre-wrap text-sm">{comment.comment_text}</p>
+                  </div>
+                  {(comment.user_name || comment.user_email) && (
+                    <div className="mt-2 text-xs text-gray-600">
+                      {comment.user_name && <span>From: {comment.user_name}</span>}
+                      {comment.user_email && (
+                        <span className="ml-2">({comment.user_email})</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -284,27 +397,127 @@ export default function UserJourneyPage() {
                   </div>
 
                   {/* Session Events */}
-                  {!isCollapsed && (
-                    <div className="p-4">
-                      <div className="space-y-3">
-                        {session.events.map((event, eventIndex) => {
-                          const naturalLanguage = formatEventAsNaturalLanguage(event, questionDetails);
-                          const showTimeGap = event.timeGapSeconds && event.timeGapSeconds > 120; // Show gaps > 2 minutes
+                  {!isCollapsed && (() => {
+                    // Merge comments with events chronologically
+                    const sessionStartTime = new Date(session.firstEvent).getTime();
+                    const sessionEndTime = new Date(session.lastEvent).getTime();
 
-                          // Extract question ID from answer events for linking
-                          const questionId = event.event_type === 'answer' ? event.event_data?.questionId : null;
-                          const questionIdShort = questionId?.substring(0, 8);
+                    // Filter comments that fall within this session's time range
+                    const sessionComments = comments.filter(comment => {
+                      const commentTime = new Date(comment.created_at).getTime();
+                      return commentTime >= sessionStartTime && commentTime <= sessionEndTime + 60000; // Add 1 min buffer
+                    });
 
-                          return (
-                            <div key={event.id}>
+                    // Transform comments to event-like objects
+                    const commentEvents = sessionComments.map(comment => ({
+                      id: `comment-${comment.id}`,
+                      created_at: comment.created_at,
+                      event_type: 'comment',
+                      isComment: true,
+                      commentData: comment,
+                    }));
+
+                    // Merge and sort all events
+                    const allEvents = [...session.events, ...commentEvents].sort((a, b) =>
+                      new Date(a.created_at) - new Date(b.created_at)
+                    );
+
+                    // Calculate time gaps for merged events
+                    let previousEvent = null;
+                    const eventsWithGaps = allEvents.map(event => {
+                      let timeGapSeconds = null;
+                      if (previousEvent) {
+                        const currentTime = new Date(event.created_at).getTime();
+                        const previousTime = new Date(previousEvent.created_at).getTime();
+                        timeGapSeconds = Math.floor((currentTime - previousTime) / 1000);
+                      }
+                      previousEvent = event;
+                      return { ...event, timeGapSeconds };
+                    });
+
+                    return (
+                      <div className="p-4">
+                        <div className="space-y-3">
+                          {eventsWithGaps.map((event, eventIndex) => {
+                            // Handle comment events differently
+                            if (event.isComment) {
+                              const comment = event.commentData;
+                              const showTimeGap = event.timeGapSeconds && event.timeGapSeconds > 120;
+
+                              return (
+                                <div key={event.id}>
+                                  {/* Time Gap Indicator */}
+                                  {showTimeGap ? (
+                                    <div className="flex items-center gap-2 py-2 text-xs text-gray-500">
+                                      <div className="flex-1 border-t border-dashed border-gray-300"></div>
+                                      <span className="px-2">⏱️ {formatTimeGap(event.timeGapSeconds)}</span>
+                                      <div className="flex-1 border-t border-dashed border-gray-300"></div>
+                                    </div>
+                                  ) : null}
+
+                                  {/* Comment Card */}
+                                  <div className="border-l-4 border-l-yellow-400 bg-yellow-50 rounded-r-lg p-4">
+                                    <div className="flex items-start gap-3">
+                                      {/* Icon */}
+                                      <div className="text-xl flex-shrink-0 mt-0.5">
+                                        💬
+                                      </div>
+
+                                      {/* Content */}
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-start justify-between gap-4">
+                                          <div className="flex-1">
+                                            <div className="text-gray-900 font-medium mb-2">
+                                              User left a comment
+                                            </div>
+                                            <div className="bg-white rounded-md p-3 border border-yellow-200">
+                                              <p className="text-gray-900 whitespace-pre-wrap text-sm">
+                                                "{comment.comment_text}"
+                                              </p>
+                                            </div>
+                                            <div className="mt-2 flex items-center gap-2 text-xs text-gray-600">
+                                              <span>On page:</span>
+                                              <code className="bg-white px-2 py-0.5 rounded border border-gray-200">
+                                                {comment.page_path}
+                                              </code>
+                                              <Link
+                                                href={comment.page_path}
+                                                target="_blank"
+                                                className="text-blue-600 hover:text-blue-800 hover:underline"
+                                              >
+                                                Visit →
+                                              </Link>
+                                            </div>
+                                          </div>
+                                          <div className="flex-shrink-0 text-right">
+                                            <p className="text-xs text-gray-500">
+                                              {formatTime(comment.created_at)}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            // Handle regular events
+                            const naturalLanguage = formatEventAsNaturalLanguage(event, questionDetails);
+                            const showTimeGap = event.timeGapSeconds && event.timeGapSeconds > 120;
+                            const questionId = event.event_type === 'answer' ? event.event_data?.questionId : null;
+                            const questionIdShort = questionId?.substring(0, 8);
+
+                            return (
+                              <div key={event.id}>
                               {/* Time Gap Indicator */}
-                              {showTimeGap && (
+                              {showTimeGap ? (
                                 <div className="flex items-center gap-2 py-2 text-xs text-gray-500">
                                   <div className="flex-1 border-t border-dashed border-gray-300"></div>
                                   <span className="px-2">⏱️ {formatTimeGap(event.timeGapSeconds)}</span>
                                   <div className="flex-1 border-t border-dashed border-gray-300"></div>
                                 </div>
-                              )}
+                              ) : null}
 
                               {/* Event Card */}
                               <div className={`border-l-4 ${getEventColor(event.event_type)} bg-gray-50 rounded-r-lg p-4`}>
@@ -318,19 +531,24 @@ export default function UserJourneyPage() {
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-start justify-between gap-4">
                                       <div className="text-gray-900 font-medium leading-relaxed whitespace-pre-line">
-                                        {questionId ? (
+                                        {questionId && naturalLanguage.includes(`#${questionIdShort}`) ? (
                                           // For answer events, make question ID clickable
-                                          <>
-                                            {naturalLanguage.split(`#${questionIdShort}`)[0]}
-                                            <Link
-                                              href={`/question/${questionId}`}
-                                              className="text-blue-600 hover:text-blue-800 hover:underline"
-                                              target="_blank"
-                                            >
-                                              #{questionIdShort}
-                                            </Link>
-                                            {naturalLanguage.split(`#${questionIdShort}`)[1]}
-                                          </>
+                                          (() => {
+                                            const parts = naturalLanguage.split(`#${questionIdShort}`);
+                                            return (
+                                              <>
+                                                {parts[0] || ''}
+                                                <Link
+                                                  href={`/question/${questionId}`}
+                                                  className="text-blue-600 hover:text-blue-800 hover:underline"
+                                                  target="_blank"
+                                                >
+                                                  #{questionIdShort}
+                                                </Link>
+                                                {parts[1] || ''}
+                                              </>
+                                            );
+                                          })()
                                         ) : (
                                           naturalLanguage
                                         )}
@@ -338,9 +556,6 @@ export default function UserJourneyPage() {
                                       <div className="flex-shrink-0 text-right">
                                         <p className="text-xs text-gray-500">
                                           {formatTime(event.created_at)}
-                                        </p>
-                                        <p className="text-xs text-gray-400 mt-0.5">
-                                          #{event.sequence_number}
                                         </p>
                                       </div>
                                     </div>
@@ -358,10 +573,11 @@ export default function UserJourneyPage() {
                               </div>
                             </div>
                           );
-                        })}
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               );
             })

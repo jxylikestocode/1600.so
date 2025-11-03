@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getUserJourney } from '@/lib/analytics-db';
 import { getQuestionsByIds } from '@/lib/data';
+import { getUserComments } from '@/lib/comments-db';
 
 /**
  * GET /api/admin/users/[userId]/journey
@@ -53,11 +54,17 @@ export async function GET(request, { params }) {
       console.log(`[Journey API] Loaded ${questions.length} question details for user ${userId}`);
     }
 
+    // Fetch user comments
+    const commentsResult = await getUserComments(userId);
+    const comments = commentsResult.success ? commentsResult.data : [];
+
     return NextResponse.json({
       userId,
+      userEmail: result.data.userEmail, // User email for authenticated users
       events: result.data.events, // Backward compatible flat events
       sessions: result.data.sessions, // New grouped sessions
       questionDetails, // New question details map
+      comments, // User comments
       total: result.data.events.length,
     });
   } catch (error) {
