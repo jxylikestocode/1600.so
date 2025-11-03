@@ -5,6 +5,7 @@ import "katex/dist/katex.min.css";
 import { UserDataProvider } from "@/contexts/user-data-context";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { AnalyticsInit } from "@/components/analytics-init";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,6 +34,7 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <AnalyticsInit />
         <UserDataProvider>{children}</UserDataProvider>
         <Analytics />
         <SpeedInsights />
