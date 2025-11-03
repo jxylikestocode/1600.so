@@ -10,6 +10,7 @@ import {
   formatDuration,
   formatTimeGap,
   formatDeviceInfo,
+  formatLocation,
   extractPageFlow,
   getEventIcon,
 } from '@/lib/journey-utils';
@@ -238,10 +239,24 @@ export default function UserJourneyPage() {
 
                         <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600">
                           {sessionInfo && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-medium">Device:</span>
-                              <span>{formatDeviceInfo(sessionInfo.device_info)}</span>
-                            </div>
+                            <>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-medium">Device:</span>
+                                <span>{formatDeviceInfo(sessionInfo.device_info)}</span>
+                              </div>
+                              {sessionInfo.device_info?.ip && (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-medium">IP:</span>
+                                  <span className="font-mono text-xs">{sessionInfo.device_info.ip}</span>
+                                </div>
+                              )}
+                              {sessionInfo.device_info?.location && (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-medium">📍 Location:</span>
+                                  <span>{formatLocation(sessionInfo.device_info.location)}</span>
+                                </div>
+                              )}
+                            </>
                           )}
                           <div className="flex items-center gap-1.5">
                             <span className="font-medium">Duration:</span>

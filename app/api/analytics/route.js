@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { storeBatchEvents, upsertUserSession } from '@/lib/analytics-db';
+import { getValidClientIP } from '@/lib/ip-utils';
+import { getGeolocation } from '@/lib/geolocation';
 
 /**
  * Analytics API Endpoint
@@ -67,17 +69,45 @@ export async function POST(request) {
         console.error('Failed to store events in database:', error);
       });
 
-    // Update session info if we have device info
+    // Update session info with device, IP, and location data
     if (events.length > 0 && events[0].userAgent) {
       const firstEvent = events[0];
+
+      // Extract IP address
+      const ipInfo = getValidClientIP(request.headers);
+      const ip = ipInfo?.ip || 'unknown';
+
+      // Fetch geolocation (async, but don't wait - fire and forget for first request)
+      let location = null;
+      try {
+        location = await getGeolocation(ip);
+      } catch (error) {
+        console.error('[Analytics] Failed to fetch geolocation:', error);
+      }
+
+      // Parse user agent for enhanced device details
+      const { UAParser } = await import('ua-parser-js');
+      const parser = new UAParser(firstEvent.userAgent);
+      const parsedUA = parser.getResult();
+
       upsertUserSession({
         userId: firstEvent.userId,
         sessionId: firstEvent.sessionId,
         deviceInfo: {
+          // Client-provided data
           userAgent: firstEvent.userAgent,
           viewport: firstEvent.viewport,
           screen: firstEvent.screen,
           language: firstEvent.language,
+
+          // Server-enhanced data
+          browser: parsedUA.browser,
+          os: parsedUA.os,
+          device: parsedUA.device,
+
+          // IP and location data
+          ip: ip,
+          location: location,
         },
       }).catch(error => {
         console.error('Failed to update session:', error);
