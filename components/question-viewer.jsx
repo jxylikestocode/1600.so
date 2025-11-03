@@ -49,7 +49,7 @@ export function QuestionViewer({
   domain,
   subject,
   selectedBands,
-  allFilteredQuestions,
+  navigationData,
   isReviewMode = false,
   reviewFilter = 'all',
 }) {
@@ -92,7 +92,7 @@ export function QuestionViewer({
   // Filter questions based on review filter if in review mode
   const actualFilteredQuestions = useMemo(() => {
     if (!isReviewMode) {
-      return allFilteredQuestions;
+      return navigationData;
     }
 
     // Get user data for filtering
@@ -111,18 +111,18 @@ export function QuestionViewer({
     // Filter based on review filter type
     switch (reviewFilter) {
       case 'bookmarked':
-        return allFilteredQuestions.filter(q => bookmarkedIds.includes(q.questionId));
+        return navigationData.filter(q => bookmarkedIds.includes(q.questionId));
       case 'incorrect':
-        return allFilteredQuestions.filter(q => incorrectIds.includes(q.questionId));
+        return navigationData.filter(q => incorrectIds.includes(q.questionId));
       case 'correct':
-        return allFilteredQuestions.filter(q => correctIds.includes(q.questionId));
+        return navigationData.filter(q => correctIds.includes(q.questionId));
       case 'correct-with-prior-incorrect':
-        return allFilteredQuestions.filter(q => correctWithPriorIncorrectIds.includes(q.questionId));
+        return navigationData.filter(q => correctWithPriorIncorrectIds.includes(q.questionId));
       default: // 'all'
         const allReviewedIds = new Set([...bookmarkedIds, ...Object.keys(answeredQuestions)]);
-        return allFilteredQuestions.filter(q => allReviewedIds.has(q.questionId));
+        return navigationData.filter(q => allReviewedIds.has(q.questionId));
     }
-  }, [isReviewMode, reviewFilter, allFilteredQuestions, userData]);
+  }, [isReviewMode, reviewFilter, navigationData, userData]);
 
   // Recalculate currentIndex and totalQuestions based on filtered questions
   const actualCurrentIndex = useMemo(() => {

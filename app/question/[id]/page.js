@@ -83,6 +83,16 @@ export default async function QuestionPage({ params, searchParams }) {
       ? filteredQuestions[currentIndex + 1]
       : null;
 
+  // Extract only minimal data for navigation (reduces payload from 12MB to ~200KB)
+  const navigationData = filteredQuestions.map(q => ({
+    questionId: q.questionId,
+    subject: q.subject,
+    skill_desc: q.skill_desc,
+    primary_class_cd_desc: q.primary_class_cd_desc,
+    score_band_range_cd: q.score_band_range_cd,
+    difficulty: q.difficulty,
+  }));
+
   return (
     <QuestionViewer
       question={question}
@@ -94,7 +104,7 @@ export default async function QuestionPage({ params, searchParams }) {
       domain={domain}
       subject={subject}
       selectedBands={selectedBands}
-      allFilteredQuestions={filteredQuestions}
+      navigationData={navigationData}
       isReviewMode={fromReview}
       reviewFilter={reviewFilter}
     />

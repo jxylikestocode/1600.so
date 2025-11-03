@@ -30,7 +30,7 @@ import { useFilters } from "@/contexts/filter-context";
  * Each filter manages its own state independently
  * Later, we'll add a way to collect all filter values for querying
  */
-export function FilterPanel({ allQuestions }) {
+export function FilterPanel() {
   const { resetFilters } = useFilters();
 
   return (
