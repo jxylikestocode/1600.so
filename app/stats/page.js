@@ -6,19 +6,22 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useUserData } from "@/contexts/user-data-context";
+import { useAuth } from "@/hooks/useAuth";
 import { ArrowLeft, TrendingUp, Clock, Target, Flame, ChevronDown, ChevronRight } from "lucide-react";
 import { AuthButton } from "@/components/auth/auth-button";
+import { trackFilter } from "@/lib/analytics";
 
 export default function StatsPage() {
   const router = useRouter();
   const userData = useUserData();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [collapsedDomains, setCollapsedDomains] = useState({});
 
-  // No longer need to load questions - stats functions use stored metadata
+  // Only use database stats for authenticated users (fetched from Supabase)
   const stats = userData.stats || { totalAnswered: 0, correctCount: 0, accuracy: 0, totalTimeSpent: 0, averageTimePerQuestion: 0, streakDays: 0 };
-  const domainStats = userData.getStatsByDomain() || {};
-  const subjectStats = userData.getStatsBySubject() || {};
-  const isLoading = userData.statsLoading;
+  const domainStats = userData.domainStats || {};
+  const subjectStats = userData.subjectStats || {};
+  const isLoading = userData.statsLoading || authLoading;
 
   // Check if user has any progress
   const hasProgress = stats && stats.totalAnswered > 0;
@@ -67,7 +70,21 @@ export default function StatsPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {isLoading ? (
+        {!isAuthenticated && !authLoading ? (
+          // Not logged in
+          <Card className="p-12 text-center">
+            <div className="text-6xl mb-4">🔒</div>
+            <div className="text-2xl font-bold text-gray-900 mb-2">
+              Sign In Required
+            </div>
+            <div className="text-gray-600 mb-6">
+              Please sign in to view your progress and statistics.
+            </div>
+            <Button onClick={() => window.location.href = '/api/auth/signin'}>
+              Sign In
+            </Button>
+          </Card>
+        ) : isLoading ? (
           // Loading State
           <Card className="p-12 text-center">
             <div className="text-6xl mb-4">⏳</div>
@@ -239,9 +256,34 @@ export default function StatsPage() {
                   {/* Loop through subjects (Math, Reading & Writing) */}
                   {Object.entries(domainStats).map(([subject, domains]) => (
                     <div key={subject}>
-                      <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                      <button
+                        onClick={async () => {
+                          // Track the filter click
+                          trackFilter('subject', subject);
+
+                          try {
+                            // Find first question matching this subject via API
+                            const response = await fetch(`/api/questions/find?subject=${encodeURIComponent(subject)}`);
+                            const data = await response.json();
+
+                            if (data.questionId) {
+                              const params = new URLSearchParams({
+                                subject: subject
+                              });
+                              router.push(`/question/${data.questionId}?${params.toString()}`);
+                            } else {
+                              // Fallback if no question found
+                              router.push('/');
+                            }
+                          } catch (error) {
+                            console.error('Error finding question:', error);
+                            router.push('/');
+                          }
+                        }}
+                        className="text-lg font-semibold text-gray-800 mb-3 hover:text-blue-600 transition-colors"
+                      >
                         {subject === "math" ? "📐 Math" : "📖 Reading & Writing"}
-                      </h3>
+                      </button>
                       <div className="space-y-3">
                         {/* Loop through domains within subject */}
                         {Object.entries(domains).map(([domain, domainData]) => {
@@ -251,19 +293,49 @@ export default function StatsPage() {
 
                           return (
                             <div key={domainKey} className="border border-gray-200 rounded-lg overflow-hidden">
-                              {/* Domain Header - Clickable */}
-                              <button
-                                onClick={() => toggleDomain(domainKey)}
-                                className="w-full p-4 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between"
-                              >
-                                <div className="flex items-center gap-3">
-                                  {isCollapsed ? <ChevronRight className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
-                                  <div className="text-left">
-                                    <div className="font-semibold text-gray-900">{domain}</div>
+                              {/* Domain Header - Collapsible and Clickable */}
+                              <div className="w-full p-4 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between">
+                                <div className="flex items-center gap-3 flex-1">
+                                  <button
+                                    onClick={() => toggleDomain(domainKey)}
+                                    className="text-gray-500 hover:text-gray-700"
+                                  >
+                                    {isCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      // Track the filter click
+                                      trackFilter('domain', domain);
+
+                                      try {
+                                        // Find first question matching this domain and subject via API
+                                        const response = await fetch(
+                                          `/api/questions/find?subject=${encodeURIComponent(subject)}&domain=${encodeURIComponent(domain)}`
+                                        );
+                                        const data = await response.json();
+
+                                        if (data.questionId) {
+                                          const params = new URLSearchParams({
+                                            domain: domain,
+                                            subject: subject
+                                          });
+                                          router.push(`/question/${data.questionId}?${params.toString()}`);
+                                        } else {
+                                          // Fallback if no question found
+                                          router.push('/');
+                                        }
+                                      } catch (error) {
+                                        console.error('Error finding question:', error);
+                                        router.push('/');
+                                      }
+                                    }}
+                                    className="text-left flex-1 hover:text-blue-600"
+                                  >
+                                    <div className="font-semibold text-gray-900 hover:text-blue-600">{domain}</div>
                                     <div className="text-sm text-gray-600">
                                       {skillCount} {skillCount === 1 ? 'skill' : 'skills'} · {domainData.totalAnswered} questions
                                     </div>
-                                  </div>
+                                  </button>
                                 </div>
                                 <Badge
                                   className={
@@ -276,7 +348,7 @@ export default function StatsPage() {
                                 >
                                   {domainData.accuracy.toFixed(0)}%
                                 </Badge>
-                              </button>
+                              </div>
 
                               {/* Skills within domain - Collapsible */}
                               {!isCollapsed && (
@@ -284,10 +356,39 @@ export default function StatsPage() {
                                   {Object.entries(domainData.skills || {})
                                     .sort(([, a], [, b]) => b.answered - a.answered)
                                     .map(([skill, skillData]) => (
-                                      <div key={skill} className="pl-4 border-l-2 border-gray-200">
+                                      <button
+                                        key={skill}
+                                        onClick={async () => {
+                                          // Track the filter click
+                                          trackFilter('skill', skill);
+
+                                          try {
+                                            // Find first question matching this skill and subject via API
+                                            const response = await fetch(
+                                              `/api/questions/find?subject=${encodeURIComponent(subject)}&skill=${encodeURIComponent(skill)}`
+                                            );
+                                            const data = await response.json();
+
+                                            if (data.questionId) {
+                                              const params = new URLSearchParams({
+                                                skill: skill,
+                                                subject: subject
+                                              });
+                                              router.push(`/question/${data.questionId}?${params.toString()}`);
+                                            } else {
+                                              // Fallback if no question found
+                                              router.push('/');
+                                            }
+                                          } catch (error) {
+                                            console.error('Error finding question:', error);
+                                            router.push('/');
+                                          }
+                                        }}
+                                        className="w-full pl-4 border-l-2 border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer text-left"
+                                      >
                                         <div className="flex items-center justify-between mb-1">
                                           <div className="flex-1">
-                                            <div className="text-sm font-medium text-gray-900">{skill}</div>
+                                            <div className="text-sm font-medium text-gray-900 hover:text-blue-600">{skill}</div>
                                             <div className="text-xs text-gray-600">
                                               {skillData.correct} / {skillData.answered} correct
                                               {" · "}
@@ -321,7 +422,7 @@ export default function StatsPage() {
                                             }}
                                           />
                                         </div>
-                                      </div>
+                                      </button>
                                     ))}
                                 </div>
                               )}

@@ -37,7 +37,7 @@ COMMENT ON FUNCTION update_question_domain IS 'Updates the domain for all answer
 CREATE OR REPLACE FUNCTION bulk_update_question_domains(
   question_domains JSONB
 )
-RETURNS TABLE(question_id TEXT, updated_count INTEGER)
+RETURNS TABLE(q_id TEXT, updated_count INTEGER)
 LANGUAGE plpgsql
 AS $$
 DECLARE
@@ -48,13 +48,13 @@ BEGIN
   LOOP
     UPDATE user_answers
     SET question_domain = item->>'domain'
-    WHERE question_id = item->>'questionId'
-      AND question_domain IS NULL;
+    WHERE user_answers.question_id = item->>'questionId'
+      AND user_answers.question_domain IS NULL;
 
     GET DIAGNOSTICS update_count = ROW_COUNT;
 
     IF update_count > 0 THEN
-      question_id := item->>'questionId';
+      q_id := item->>'questionId';
       updated_count := update_count;
       RETURN NEXT;
     END IF;

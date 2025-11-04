@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { inferSubjectFromDomain } from "@/lib/stats-utils";
+import { getAllQuestions } from "@/lib/data";
 
 /**
  * GET /api/stats
@@ -116,15 +118,19 @@ export async function GET(request) {
       });
     }
 
-    // Fetch stats by skill (including domain and subject for hierarchical grouping)
+    // Fetch stats by skill - we'll enrich with question data from JSON files
     const { data: skillData, error: skillError } = await supabase
       .from('user_answers')
-      .select('question_id, question_skill, question_domain, question_subject, is_correct, time_spent_seconds')
+      .select('question_id, is_correct, time_spent_seconds')
       .eq('user_id', userId);
 
     if (skillError) {
       console.error('Error fetching skill stats:', skillError);
     }
+
+    // Load all questions to get skill names
+    const allQuestions = await getAllQuestions();
+    const questionsLookup = new Map(allQuestions.map(q => [q.questionId, q]));
 
     // Build hierarchical stats: subject → domain → skills
     const domainStats = {};
@@ -132,9 +138,16 @@ export async function GET(request) {
       const hierarchy = new Map();
 
       skillData.forEach(row => {
-        const subject = row.question_subject || 'Unknown';
-        const domain = row.question_domain || 'Unknown';
-        const skill = row.question_skill || 'Unknown';
+        // Get question metadata from the questions data
+        const question = questionsLookup.get(row.question_id);
+
+        // Use question metadata if available, otherwise fallback to stored values
+        const rawSubject = question?.subject || 'Unknown';
+        const domain = question?.primary_class_cd_desc || 'Unknown';
+        const skill = question?.skill_desc || 'Unknown';
+
+        // Infer correct subject from domain (fixes misclassified math questions)
+        const subject = inferSubjectFromDomain(domain, rawSubject);
 
         // Initialize subject
         if (!hierarchy.has(subject)) {
@@ -168,11 +181,11 @@ export async function GET(request) {
           });
         }
 
-        const question = skillQuestions.get(row.question_id);
+        const questionStats = skillQuestions.get(row.question_id);
         if (row.is_correct) {
-          question.correctAtAnyPoint = true;
+          questionStats.correctAtAnyPoint = true;
         }
-        question.totalTime += row.time_spent_seconds || 0;
+        questionStats.totalTime += row.time_spent_seconds || 0;
 
         // Track question for domain aggregate
         if (!domainData.totalQuestions.has(row.question_id)) {
