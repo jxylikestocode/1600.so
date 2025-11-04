@@ -116,54 +116,117 @@ export async function GET(request) {
       });
     }
 
-    // Fetch stats by skill
+    // Fetch stats by skill (including domain and subject for hierarchical grouping)
     const { data: skillData, error: skillError } = await supabase
       .from('user_answers')
-      .select('question_id, question_skill, is_correct, time_spent_seconds')
+      .select('question_id, question_skill, question_domain, question_subject, is_correct, time_spent_seconds')
       .eq('user_id', userId);
 
     if (skillError) {
       console.error('Error fetching skill stats:', skillError);
     }
 
-    const skillStats = {};
+    // Build hierarchical stats: subject → domain → skills
+    const domainStats = {};
     if (skillData) {
-      const skillQuestions = new Map();
+      const hierarchy = new Map();
 
       skillData.forEach(row => {
+        const subject = row.question_subject || 'Unknown';
+        const domain = row.question_domain || 'Unknown';
         const skill = row.question_skill || 'Unknown';
-        if (!skillQuestions.has(skill)) {
-          skillQuestions.set(skill, new Map());
+
+        // Initialize subject
+        if (!hierarchy.has(subject)) {
+          hierarchy.set(subject, new Map());
         }
 
-        const questions = skillQuestions.get(skill);
-        if (!questions.has(row.question_id)) {
-          questions.set(row.question_id, {
+        const subjectMap = hierarchy.get(subject);
+
+        // Initialize domain
+        if (!subjectMap.has(domain)) {
+          subjectMap.set(domain, {
+            skills: new Map(),
+            totalQuestions: new Map(),
+          });
+        }
+
+        const domainData = subjectMap.get(domain);
+
+        // Initialize skill
+        if (!domainData.skills.has(skill)) {
+          domainData.skills.set(skill, new Map());
+        }
+
+        const skillQuestions = domainData.skills.get(skill);
+
+        // Track question for skill
+        if (!skillQuestions.has(row.question_id)) {
+          skillQuestions.set(row.question_id, {
             correctAtAnyPoint: row.is_correct,
             totalTime: 0,
           });
         }
 
-        const question = questions.get(row.question_id);
+        const question = skillQuestions.get(row.question_id);
         if (row.is_correct) {
           question.correctAtAnyPoint = true;
         }
         question.totalTime += row.time_spent_seconds || 0;
+
+        // Track question for domain aggregate
+        if (!domainData.totalQuestions.has(row.question_id)) {
+          domainData.totalQuestions.set(row.question_id, {
+            correctAtAnyPoint: row.is_correct,
+            totalTime: 0,
+          });
+        }
+
+        const domainQuestion = domainData.totalQuestions.get(row.question_id);
+        if (row.is_correct) {
+          domainQuestion.correctAtAnyPoint = true;
+        }
+        domainQuestion.totalTime += row.time_spent_seconds || 0;
       });
 
-      // Calculate stats for each skill
-      skillQuestions.forEach((questions, skill) => {
-        const answered = questions.size;
-        const correct = Array.from(questions.values()).filter(q => q.correctAtAnyPoint).length;
-        const totalTime = Array.from(questions.values()).reduce((sum, q) => sum + q.totalTime, 0);
-        const accuracy = answered > 0 ? (correct / answered) * 100 : 0;
+      // Calculate stats for the hierarchy
+      hierarchy.forEach((subjectMap, subject) => {
+        if (!domainStats[subject]) {
+          domainStats[subject] = {};
+        }
 
-        skillStats[skill] = {
-          answered,
-          correct,
-          totalTime,
-          accuracy,
-        };
+        subjectMap.forEach((domainData, domain) => {
+          const skillsObj = {};
+
+          // Calculate skill stats
+          domainData.skills.forEach((questions, skill) => {
+            const answered = questions.size;
+            const correct = Array.from(questions.values()).filter(q => q.correctAtAnyPoint).length;
+            const totalTime = Array.from(questions.values()).reduce((sum, q) => sum + q.totalTime, 0);
+            const accuracy = answered > 0 ? (correct / answered) * 100 : 0;
+
+            skillsObj[skill] = {
+              answered,
+              correct,
+              totalTime,
+              accuracy,
+            };
+          });
+
+          // Calculate domain aggregate stats
+          const totalAnswered = domainData.totalQuestions.size;
+          const totalCorrect = Array.from(domainData.totalQuestions.values()).filter(q => q.correctAtAnyPoint).length;
+          const totalTime = Array.from(domainData.totalQuestions.values()).reduce((sum, q) => sum + q.totalTime, 0);
+          const domainAccuracy = totalAnswered > 0 ? (totalCorrect / totalAnswered) * 100 : 0;
+
+          domainStats[subject][domain] = {
+            skills: skillsObj,
+            totalAnswered,
+            totalCorrect,
+            totalTime,
+            accuracy: domainAccuracy,
+          };
+        });
       });
     }
 
@@ -186,7 +249,7 @@ export async function GET(request) {
         lastActivity,
       },
       subjectStats,
-      skillStats,
+      domainStats, // Hierarchical: subject → domain → skills
     });
 
   } catch (error) {

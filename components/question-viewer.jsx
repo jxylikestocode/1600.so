@@ -320,10 +320,11 @@ export function QuestionViewer({
       correct,
       elapsedTime,
       {
-        skill: question.skill_desc,
+        skill_desc: question.skill_desc,
         subject: question.subject || 'reading-writing',
         difficulty: question.difficulty,
         scoreBand: question.score_band_range_cd,
+        primary_class_cd_desc: question.primary_class_cd_desc, // Domain (e.g., "Algebra", "Geometry")
       }
     );
 

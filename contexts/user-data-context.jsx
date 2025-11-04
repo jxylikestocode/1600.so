@@ -20,6 +20,7 @@ export function UserDataProvider({ children }) {
   const [statsLoading, setStatsLoading] = useState(false);
   const [subjectStats, setSubjectStats] = useState(null);
   const [skillStats, setSkillStats] = useState(null);
+  const [domainStats, setDomainStats] = useState(null);
 
   const { user, isAuthenticated } = useAuth();
 
@@ -43,6 +44,7 @@ export function UserDataProvider({ children }) {
         setStats(storage.getStats());
         setSubjectStats(storage.getStatsBySubject());
         setSkillStats(storage.getStatsBySkill());
+        setDomainStats(storage.getStatsByDomain());
       }
       setBookmarks(storage.getBookmarks());
     }
@@ -91,20 +93,20 @@ export function UserDataProvider({ children }) {
       if (data.success) {
         setStats(data.stats);
         setSubjectStats(data.subjectStats);
-        setSkillStats(data.skillStats);
+        setDomainStats(data.domainStats);
       } else {
         console.error('Failed to fetch stats from database:', data.error);
         // Fallback to localStorage
         setStats(storage.getStats());
         setSubjectStats(storage.getStatsBySubject());
-        setSkillStats(storage.getStatsBySkill());
+        setDomainStats(storage.getStatsByDomain());
       }
     } catch (error) {
       console.error('Error fetching stats from database:', error);
       // Fallback to localStorage
       setStats(storage.getStats());
       setSubjectStats(storage.getStatsBySubject());
-      setSkillStats(storage.getStatsBySkill());
+      setDomainStats(storage.getStatsByDomain());
     } finally {
       setStatsLoading(false);
     }
@@ -290,6 +292,7 @@ export function UserDataProvider({ children }) {
     statsLoading,
     subjectStats,
     skillStats,
+    domainStats,
 
     // Login prompt state
     showLoginPrompt,
@@ -318,6 +321,14 @@ export function UserDataProvider({ children }) {
       }
       // For anonymous users, use localStorage
       return storage.getStatsBySkill();
+    },
+    getStatsByDomain: () => {
+      // For authenticated users, use database stats
+      if (isAuthenticated && domainStats) {
+        return domainStats;
+      }
+      // For anonymous users, use localStorage
+      return storage.getStatsByDomain();
     },
     getAllAnsweredQuestions: storage.getAllAnsweredQuestions,
 

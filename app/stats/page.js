@@ -1,25 +1,34 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useUserData } from "@/contexts/user-data-context";
-import { ArrowLeft, TrendingUp, Clock, Target, Flame } from "lucide-react";
+import { ArrowLeft, TrendingUp, Clock, Target, Flame, ChevronDown, ChevronRight } from "lucide-react";
 import { AuthButton } from "@/components/auth/auth-button";
 
 export default function StatsPage() {
   const router = useRouter();
   const userData = useUserData();
+  const [collapsedDomains, setCollapsedDomains] = useState({});
 
   // No longer need to load questions - stats functions use stored metadata
   const stats = userData.stats || { totalAnswered: 0, correctCount: 0, accuracy: 0, totalTimeSpent: 0, averageTimePerQuestion: 0, streakDays: 0 };
-  const skillStats = userData.getStatsBySkill() || {};
+  const domainStats = userData.getStatsByDomain() || {};
   const subjectStats = userData.getStatsBySubject() || {};
   const isLoading = userData.statsLoading;
 
   // Check if user has any progress
   const hasProgress = stats && stats.totalAnswered > 0;
+
+  const toggleDomain = (key) => {
+    setCollapsedDomains(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -220,59 +229,108 @@ export default function StatsPage() {
               </Card>
             )}
 
-            {/* Performance by Skill */}
-            {Object.keys(skillStats).length > 0 && (
+            {/* Performance by Domain and Skill */}
+            {Object.keys(domainStats).length > 0 && (
               <Card className="p-6 mb-8">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">
                   Performance by Skill
-                  <span className="text-sm font-normal text-gray-500 ml-2">
-                    ({Object.keys(skillStats).length} skills practiced)
-                  </span>
                 </h2>
-                <div className="space-y-3">
-                  {Object.entries(skillStats)
-                    .sort(([, a], [, b]) => b.answered - a.answered)
-                    .map(([skill, data]) => (
-                      <div key={skill} className="p-4 bg-gray-50 rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex-1">
-                            <div className="font-medium text-gray-900">
-                              {skill}
+                <div className="space-y-6">
+                  {/* Loop through subjects (Math, Reading & Writing) */}
+                  {Object.entries(domainStats).map(([subject, domains]) => (
+                    <div key={subject}>
+                      <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                        {subject === "math" ? "📐 Math" : "📖 Reading & Writing"}
+                      </h3>
+                      <div className="space-y-3">
+                        {/* Loop through domains within subject */}
+                        {Object.entries(domains).map(([domain, domainData]) => {
+                          const domainKey = `${subject}-${domain}`;
+                          const isCollapsed = collapsedDomains[domainKey];
+                          const skillCount = Object.keys(domainData.skills || {}).length;
+
+                          return (
+                            <div key={domainKey} className="border border-gray-200 rounded-lg overflow-hidden">
+                              {/* Domain Header - Clickable */}
+                              <button
+                                onClick={() => toggleDomain(domainKey)}
+                                className="w-full p-4 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between"
+                              >
+                                <div className="flex items-center gap-3">
+                                  {isCollapsed ? <ChevronRight className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
+                                  <div className="text-left">
+                                    <div className="font-semibold text-gray-900">{domain}</div>
+                                    <div className="text-sm text-gray-600">
+                                      {skillCount} {skillCount === 1 ? 'skill' : 'skills'} · {domainData.totalAnswered} questions
+                                    </div>
+                                  </div>
+                                </div>
+                                <Badge
+                                  className={
+                                    domainData.accuracy >= 70
+                                      ? "bg-green-100 text-green-800"
+                                      : domainData.accuracy >= 50
+                                      ? "bg-yellow-100 text-yellow-800"
+                                      : "bg-red-100 text-red-800"
+                                  }
+                                >
+                                  {domainData.accuracy.toFixed(0)}%
+                                </Badge>
+                              </button>
+
+                              {/* Skills within domain - Collapsible */}
+                              {!isCollapsed && (
+                                <div className="p-4 space-y-3 bg-white">
+                                  {Object.entries(domainData.skills || {})
+                                    .sort(([, a], [, b]) => b.answered - a.answered)
+                                    .map(([skill, skillData]) => (
+                                      <div key={skill} className="pl-4 border-l-2 border-gray-200">
+                                        <div className="flex items-center justify-between mb-1">
+                                          <div className="flex-1">
+                                            <div className="text-sm font-medium text-gray-900">{skill}</div>
+                                            <div className="text-xs text-gray-600">
+                                              {skillData.correct} / {skillData.answered} correct
+                                              {" · "}
+                                              {Math.floor(skillData.totalTime / skillData.answered)}s avg
+                                            </div>
+                                          </div>
+                                          <Badge
+                                            className={
+                                              skillData.accuracy >= 70
+                                                ? "bg-green-100 text-green-800"
+                                                : skillData.accuracy >= 50
+                                                ? "bg-yellow-100 text-yellow-800"
+                                                : "bg-red-100 text-red-800"
+                                            }
+                                            variant="outline"
+                                          >
+                                            {skillData.accuracy.toFixed(0)}%
+                                          </Badge>
+                                        </div>
+                                        <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                          <div
+                                            className={`h-1.5 rounded-full ${
+                                              skillData.accuracy >= 70
+                                                ? "bg-green-600"
+                                                : skillData.accuracy >= 50
+                                                ? "bg-yellow-600"
+                                                : "bg-red-600"
+                                            }`}
+                                            style={{
+                                              width: `${Math.min(skillData.accuracy, 100)}%`,
+                                            }}
+                                          />
+                                        </div>
+                                      </div>
+                                    ))}
+                                </div>
+                              )}
                             </div>
-                            <div className="text-sm text-gray-600">
-                              {data.correct} / {data.answered} correct
-                              {" · "}
-                              {Math.floor(data.totalTime / data.answered)}s avg
-                            </div>
-                          </div>
-                          <Badge
-                            className={
-                              data.accuracy >= 70
-                                ? "bg-green-100 text-green-800"
-                                : data.accuracy >= 50
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-red-100 text-red-800"
-                            }
-                          >
-                            {data.accuracy.toFixed(0)}%
-                          </Badge>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full ${
-                              data.accuracy >= 70
-                                ? "bg-green-600"
-                                : data.accuracy >= 50
-                                ? "bg-yellow-600"
-                                : "bg-red-600"
-                            }`}
-                            style={{
-                              width: `${Math.min(data.accuracy, 100)}%`,
-                            }}
-                          />
-                        </div>
+                          );
+                        })}
                       </div>
-                    ))}
+                    </div>
+                  ))}
                 </div>
               </Card>
             )}
