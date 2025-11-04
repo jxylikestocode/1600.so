@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -111,6 +112,29 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Quick Navigation */}
+        <Card className="p-6 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Navigation</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Link href="/admin/users">
+              <Button className="w-full h-20 text-lg" variant="outline">
+                <div className="text-center">
+                  <div className="font-bold">👥 User Analytics</div>
+                  <div className="text-sm text-gray-600 mt-1">View all users and their activity</div>
+                </div>
+              </Button>
+            </Link>
+            <Link href="/admin/comments">
+              <Button className="w-full h-20 text-lg" variant="outline">
+                <div className="text-center">
+                  <div className="font-bold">💬 Comments</div>
+                  <div className="text-sm text-gray-600 mt-1">Manage user feedback</div>
+                </div>
+              </Button>
+            </Link>
+          </div>
+        </Card>
+
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <Card className="p-6">

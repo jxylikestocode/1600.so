@@ -80,9 +80,7 @@ export default function StatsPage() {
             <div className="text-gray-600 mb-6">
               Please sign in to view your progress and statistics.
             </div>
-            <Button onClick={() => window.location.href = '/api/auth/signin'}>
-              Sign In
-            </Button>
+            <AuthButton />
           </Card>
         ) : isLoading ? (
           // Loading State
